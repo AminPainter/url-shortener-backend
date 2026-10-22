@@ -7,7 +7,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 - Write the bare minimum code needed to finish the task. No speculative abstractions, helpers, options, layers or files "for later".
 - Do not add dependencies, infra or features that the task does not require.
 - Match existing idiom:
-  - ESM with `.js` suffixes on relative imports.
+  - ESM with extensionless relative imports (`moduleResolution: bundler`; Rspack bundles each app). `nest g` still emits `.js` suffixes, so strip them. Import libs via `@app/<name>`, never `../../libs/...`.
   - Fastify, not Express.
   - Config through `ConfigService.getOrThrow<T>()`.
 - pnpm only. Never use npm or yarn, even when a tool's output suggests an `npm install` command.
@@ -15,13 +15,18 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 ## Architecture
 - `apps/read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
 - `apps/write-service`: everything under the global prefix `/api`.
-- `libs/`:
+- `libs/`: shared code, one Nest library per concern. Single root `package.json`; libs are path aliases bundled into each app, not workspace packages.
   - Shared contracts and infra plumbing only.
   - Never business logic, and never one service importing another service's internals.
-  - Create libs with `pnpm exec nest g library <name>`, which gives an `@app/<name>` alias.
+  - One concern per lib, named for what it does. No catch-all `common`/`shared` lib.
+  - Public API is `src/index.ts` only. Libs never import apps.
+  - Create with `pnpm exec nest g library <name>` (accept the `@app` prefix). Then:
+    - Strip `.js` suffixes from generated imports.
+    - Delete the generated module/service/spec when the lib needs no DI.
+    - Remove the deep `@app/<name>/*` alias it adds to `tsconfig.json`.
+  - Current libs: `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
 - Kong (DB-less) is the only gateway, configured in `infra/kong/kong.yml`:
-  - `/api` → write-service.
-  - `/` → read-service.
+  - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
   - After editing, run `docker compose restart kong`.
 - Services talk HTTP/REST to Kong and never call each other.

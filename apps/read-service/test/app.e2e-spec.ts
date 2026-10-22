@@ -3,7 +3,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { ReadServiceModule } from './../src/read-service.module.js';
+import { ReadServiceModule } from './../src/read-service.module';
 
 describe('ReadService (e2e)', () => {
   let app: NestFastifyApplication;

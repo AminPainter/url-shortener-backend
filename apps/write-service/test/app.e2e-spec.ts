@@ -3,7 +3,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { WriteServiceModule } from './../src/write-service.module.js';
+import { WriteServiceModule } from './../src/write-service.module';
 
 describe('WriteService (e2e)', () => {
   let app: NestFastifyApplication;
@@ -26,6 +26,31 @@ describe('WriteService (e2e)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: 'ok' });
   });
+
+  it('POST /api/short-urls', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/short-urls',
+      payload: { longUrl: 'https://glomo.one' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({
+      shortCode: expect.stringMatching(/^[0-9A-Za-z]{7}$/),
+      longUrl: 'https://glomo.one',
+    });
+  });
+
+  it.each([{}, { longUrl: 'not a url' }, { longUrl: 'ftp://x' }])(
+    'POST /api/short-urls rejects %j',
+    async (payload) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/short-urls',
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
+    },
+  );
 
   afterEach(async () => {
     await app.close();
