@@ -38,6 +38,9 @@
       "path": "./libs/prisma/tsconfig.lib.json"
     },
     {
+      "path": "./libs/validation/tsconfig.lib.json"
+    },
+    {
       "path": "./tsconfig.spec.json"
     }
   ]

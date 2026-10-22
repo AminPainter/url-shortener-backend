@@ -1,5 +1,6 @@
 import { z } from 'zod';
+import { createZodDto } from '@app/validation';
 
-export const createShortUrlSchema = z.object({ longUrl: z.httpUrl() });
-
-export type CreateShortUrlDto = z.infer<typeof createShortUrlSchema>;
+export class CreateShortUrlDto extends createZodDto(
+  z.object({ longUrl: z.httpUrl() }),
+) {}

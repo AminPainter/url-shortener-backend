@@ -1,7 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Body, Controller, Post } from '@nestjs/common';
-import { ZodValidationPipe } from '@app/validation';
-import { createShortUrlSchema, type CreateShortUrlDto } from './create-short-url.dto';
+import { CreateShortUrlDto } from './create-short-url.dto';
 
 const ALPHABET =
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -9,10 +8,7 @@ const ALPHABET =
 @Controller('short-urls')
 export class ShortUrlsController {
   @Post()
-  create(
-    @Body(new ZodValidationPipe(createShortUrlSchema))
-    { longUrl }: CreateShortUrlDto,
-  ) {
+  create(@Body() { longUrl }: CreateShortUrlDto) {
     const shortCode = Array.from(
       { length: 7 },
       () => ALPHABET[randomInt(62)],
