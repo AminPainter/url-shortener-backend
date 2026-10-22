@@ -3,6 +3,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { PrismaService } from '@app/prisma';
 import { WriteServiceModule } from './../src/write-service.module';
 
 describe('WriteService (e2e)', () => {
@@ -38,6 +39,12 @@ describe('WriteService (e2e)', () => {
       shortCode: expect.stringMatching(/^[0-9A-Za-z]{7}$/),
       longUrl: 'https://glomo.one',
     });
+
+    const prisma = app.get(PrismaService);
+    const { shortCode } = res.json();
+    const row = await prisma.shortUrl.findUnique({ where: { shortCode } });
+    expect(row?.longUrl).toBe('https://glomo.one');
+    await prisma.shortUrl.delete({ where: { shortCode } });
   });
 
   it.each([{}, { longUrl: 'not a url' }, { longUrl: 'ftp://x' }])(
