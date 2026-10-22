@@ -1,0 +1,16 @@
+_format_version: '3.0'
+
+services:
+  - name: write-service
+    url: http://host.docker.internal:9112
+    routes:
+      - name: write-api
+        paths: [/api]
+        strip_path: false
+
+  - name: read-service
+    url: http://host.docker.internal:9111
+    routes:
+      - name: read-redirect
+        paths: [/]
+        strip_path: false
