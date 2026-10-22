@@ -18,6 +18,7 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "paths": {
+      "@app/prisma": ["./libs/prisma/src"],
       "@app/validation": ["./libs/validation/src"]
     },
     "types": [
@@ -32,6 +33,9 @@
     },
     {
       "path": "./apps/write-service/tsconfig.app.json"
+    },
+    {
+      "path": "./libs/prisma/tsconfig.lib.json"
     },
     {
       "path": "./tsconfig.spec.json"

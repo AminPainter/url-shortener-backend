@@ -12,6 +12,7 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
   app.setGlobalPrefix('api');
+  app.enableShutdownHooks();
   await app.listen(
     app.get(ConfigService).getOrThrow<string>('WRITE_SERVICE_PORT'),
     '0.0.0.0',

@@ -24,7 +24,10 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - Strip `.js` suffixes from generated imports.
     - Delete the generated module/service/spec when the lib needs no DI.
     - Remove the deep `@app/<name>/*` alias it adds to `tsconfig.json`.
-  - Current libs: `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
+    - If the lib uses decorators, add its `tsconfig.lib.json` to the root `tsconfig.json` `references`, or Vitest leaves the decorators untransformed (SyntaxError).
+  - Current libs:
+    - `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
+    - `@app/prisma` (`PrismaModule`, `PrismaService`), imported by both apps.
 - Kong (DB-less) is the only gateway, configured in `infra/kong/kong.yml`:
   - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
@@ -65,9 +68,9 @@ Health checks through Kong:
 - `curl localhost:9113/api/health` (write-service)
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring (no models yet).
 - Not yet: do not add these unless the task explicitly asks for them.
-  - ORM and schema.
+  - Prisma models and migrations.
   - BullMQ or any other broker.
   - Auth.
   - Kong plugins.
@@ -86,6 +89,13 @@ Health checks through Kong:
     - TTL is the smaller of the default and the time left until `expiresAt`.
     - Misses are cached too, with a short TTL.
     - write-service deletes the cache key when a link is deleted or changed.
+
+## Prisma
+- Prisma ORM 7, pinned (`prisma@7.10.1`). npm `latest` is the Prisma 8 RC with a different API; never install unpinned.
+- Schema `prisma/schema.prisma`, config `prisma.config.ts` (loads `.env` via `process.loadEnvFile()`).
+- `prisma-client` generator writes to `libs/prisma/src/generated/prisma` (gitignored, lint-ignored). `postinstall` runs `prisma generate`.
+- Driver adapter `@prisma/adapter-pg`. Prisma connects lazily, so tests boot without a DB.
+- After schema changes: `pnpm exec prisma generate` (`migrate dev` does not regenerate).
 
 ## Gotchas
 - Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `DATABASE_URL`, `REDIS_URL`.

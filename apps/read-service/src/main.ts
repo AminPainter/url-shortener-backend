@@ -11,6 +11,7 @@ async function bootstrap() {
     ReadServiceModule,
     new FastifyAdapter(),
   );
+  app.enableShutdownHooks();
   await app.listen(
     app.get(ConfigService).getOrThrow<string>('READ_SERVICE_PORT'),
     '0.0.0.0',

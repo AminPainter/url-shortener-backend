@@ -10,6 +10,15 @@
   "monorepo": true,
   "root": "apps/read-service",
   "projects": {
+    "prisma": {
+      "type": "library",
+      "root": "libs/prisma",
+      "entryFile": "index",
+      "sourceRoot": "libs/prisma/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/prisma/tsconfig.lib.json"
+      }
+    },
     "read-service": {
       "type": "application",
       "root": "apps/read-service",
@@ -19,15 +28,6 @@
         "tsConfigPath": "apps/read-service/tsconfig.app.json"
       }
     },
-    "write-service": {
-      "type": "application",
-      "root": "apps/write-service",
-      "entryFile": "main",
-      "sourceRoot": "apps/write-service/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/write-service/tsconfig.app.json"
-      }
-    },
     "validation": {
       "type": "library",
       "root": "libs/validation",
@@ -35,6 +35,15 @@
       "sourceRoot": "libs/validation/src",
       "compilerOptions": {
         "tsConfigPath": "libs/validation/tsconfig.lib.json"
+      }
+    },
+    "write-service": {
+      "type": "application",
+      "root": "apps/write-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/write-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/write-service/tsconfig.app.json"
       }
     }
   }
