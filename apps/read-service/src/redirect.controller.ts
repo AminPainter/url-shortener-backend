@@ -5,20 +5,17 @@ import {
   Param,
   Redirect,
 } from '@nestjs/common';
-import { PrismaService } from '@app/prisma';
+import { RedirectService } from './redirect.service';
 
 @Controller()
 export class RedirectController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly redirectService: RedirectService) {}
 
-  @Get(':code')
+  @Get(':shortCode')
   @Redirect()
-  async redirect(@Param('code') code: string) {
-    const row = await this.prisma.shortUrl.findUnique({
-      where: { shortCode: code },
-      select: { longUrl: true },
-    });
-    if (!row) throw new NotFoundException();
-    return { url: row.longUrl, statusCode: 302 };
+  async redirect(@Param('shortCode') shortCode: string) {
+    const longUrl = await this.redirectService.resolve(shortCode);
+    if (!longUrl) throw new NotFoundException();
+    return { url: longUrl, statusCode: 302 };
   }
 }
