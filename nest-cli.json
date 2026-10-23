@@ -19,6 +19,15 @@
         "tsConfigPath": "libs/cache/tsconfig.lib.json"
       }
     },
+    "logger": {
+      "type": "library",
+      "root": "libs/logger",
+      "entryFile": "index",
+      "sourceRoot": "libs/logger/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/logger/tsconfig.lib.json"
+      }
+    },
     "prisma": {
       "type": "library",
       "root": "libs/prisma",
@@ -32,6 +41,7 @@
       "type": "application",
       "root": "apps/read-service",
       "entryFile": "main",
+      "exec": "OTEL_SERVICE_NAME=read-service node --env-file=.env --import ./instrumentation.mjs",
       "sourceRoot": "apps/read-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/read-service/tsconfig.app.json"
@@ -50,6 +60,7 @@
       "type": "application",
       "root": "apps/write-service",
       "entryFile": "main",
+      "exec": "OTEL_SERVICE_NAME=write-service node --env-file=.env --import ./instrumentation.mjs",
       "sourceRoot": "apps/write-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/write-service/tsconfig.app.json"

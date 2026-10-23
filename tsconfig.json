@@ -19,6 +19,7 @@
     "strictPropertyInitialization": false,
     "paths": {
       "@app/cache": ["./libs/cache/src"],
+      "@app/logger": ["./libs/logger/src"],
       "@app/prisma": ["./libs/prisma/src"],
       "@app/validation": ["./libs/validation/src"]
     },

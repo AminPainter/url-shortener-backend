@@ -36,17 +36,19 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
     - `@app/prisma` (`PrismaModule`, `PrismaService`), imported by both apps.
     - `@app/cache` (`RedisCacheModule`): Nest `CacheModule` on Redis via `@keyv/redis`; inject with `@Inject(CACHE_MANAGER) cache: Cache`. Owns the `short-url:` key namespace; TTL policy stays in the app.
+    - `@app/logger` (`PinoLoggerModule`, `Logger`): nestjs-pino. Each app imports `PinoLoggerModule` and calls `app.useLogger(app.get(Logger))` with `bufferLogs: true`.
 - Kong (DB-less) is the only gateway, configured in `infra/kong/kong.yml`:
   - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
   - After editing, run `docker compose restart kong`.
+  - The only plugin is a global `opentelemetry`. It sends traces to otel-lgtm and injects W3C `traceparent` upstream.
 - Services talk HTTP/REST to Kong and never call each other.
 - Each app listens on `0.0.0.0` so Kong can reach it from Docker.
 - Builds: each app is bundled by Rspack (`"builder": "rspack"` in `nest-cli.json`) into `dist/apps/<app>/main.js`.
 
 ## Runtime
 - Nest apps run natively on the host.
-- Postgres, Redis and Kong run in Docker Compose.
+- Postgres, Redis, Kong and otel-lgtm (Grafana, Tempo, Loki, Prometheus) run in Docker Compose.
 
 Host ports start at 9111:
 
@@ -58,8 +60,10 @@ Host ports start at 9111:
 | 9114 | Kong admin (localhost only) |
 | 9115 | Postgres (`DATABASE_URL`, db `url_shortener`) |
 | 9116 | Redis (`REDIS_URL`, `allkeys-lru`, 256mb) |
+| 9117 | Grafana UI (localhost only, admin/admin) |
+| 9118 | OTLP HTTP into otel-lgtm (localhost only, `OTEL_EXPORTER_OTLP_ENDPOINT`) |
 
-New host ports continue sequentially from 9117.
+New host ports continue sequentially from 9119.
 
 ## Commands
 ```
@@ -75,12 +79,33 @@ Health checks through Kong:
 - `curl localhost:9113/health` (read-service)
 - `curl localhost:9113/api/health` (write-service)
 
+## Observability
+- OpenTelemetry starts from `instrumentation.mjs` at the repo root, a plain ESM preload outside Rspack.
+  - Rspack emits node_modules as hoisted static ESM imports, so the SDK cannot start inside the bundle.
+  - `nest-cli.json` sets a per-project `exec`: `OTEL_SERVICE_NAME=<app> node --env-file=.env --import ./instrumentation.mjs`.
+  - Do not use `NODE_OPTIONS`, which would also load the SDK into the Nest CLI and Rspack.
+  - Edits to the preload need an app restart; watch mode does not reload it.
+- Instrumentations:
+  - http.
+  - `@fastify/otel` (hooks off, handler on).
+  - pg (bind params never recorded).
+  - redis (statement is `<CMD> <key>` only).
+  - pino (trace_id/span_id on every log line, plus OTLP log export).
+  - `@opentelemetry/instrumentation-nestjs-core` is a no-op on Nest 12; do not add it.
+- Every package the preload imports must be a direct dependency, because of pnpm's strict layout.
+- Pin the OTel set together. `@opentelemetry/api` must satisfy `@opentelemetry/sdk-node`'s peer range.
+- Never put long URLs, query strings or request bodies in spans, logs or metric labels.
+  - The preload redacts `url.query` and strips the query from the Fastify `url.path`.
+  - `@app/logger` serializes only `req.id/method/path` and `res.statusCode`, so the 302 `Location` header is never logged.
+- Health routes are excluded from traces and request logs.
+- Tests run without the preload, so they send no telemetry.
+
 ## Current state and decisions
 - Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Auth.
-  - Kong plugins.
+  - Kong plugins other than `opentelemetry`.
   - App Dockerfiles and CI.
 - Planned data model additions to `ShortUrl`:
   - `shortCode` also holds custom aliases.
@@ -102,6 +127,8 @@ Health checks through Kong:
 - Add a global exception filter (`APP_FILTER`) to each app, shared through a lib, that translates domain exceptions into HTTP responses.
 - Make the service layer always throw domain exceptions (e.g. `ShortUrlNotFoundError`), never return `null` for "not found" and never throw Nest HTTP exceptions. Only the exception filter translates them to HTTP. Today `RedirectService.resolve` returns `null` and `RedirectController` throws `NotFoundException`; migrate it when the filter lands.
 - Figure out test organisation for this Nest microservices monorepo. Today each app has a single `test/app.e2e-spec.ts` covering every route, and there are no unit specs. Decide: one e2e file per feature or controller, whether services get `*.spec.ts` unit tests next to the source, where cross-service flows through Kong are tested, and shared test bootstrap/fixtures (app setup, random short codes, DB and Redis cleanup).
+- Monitor the health of every service and its dependencies. Keep `/health` as liveness only; add a readiness endpoint per app (with its own Kong route) that pings Postgres (503 when down) and reports Redis as degraded without failing readiness. Wire it into whatever monitoring/alerting we adopt.
+- Make sure Postgres is connected before an app serves users: today Prisma and Redis both connect lazily on the first request. Connect and verify Postgres during bootstrap (fail startup if unreachable) before `app.listen`. Redis must not block startup (it is a cache; fail open), but warm its connection at boot and log a warning when it is down.
 
 ## Prisma
 - Prisma ORM 7, pinned (`prisma@7.10.1`). npm `latest` is the Prisma 8 RC with a different API; never install unpinned.
@@ -116,6 +143,6 @@ Health checks through Kong:
 
 ## Gotchas
 - Host port 6379 may belong to another project's Redis. `REDIS_URL` must point at 9116.
-- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `DATABASE_URL`, `REDIS_URL`.
+- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
 - After changing `.env`, restart the service; watch mode does not reload env.
 - A Kong 502 means the target service is not running or is on the wrong port.
