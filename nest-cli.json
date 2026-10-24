@@ -1,14 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/read-service/src",
+  "sourceRoot": "apps/short-url-read-service/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "builder": "rspack",
-    "tsConfigPath": "apps/read-service/tsconfig.app.json"
+    "tsConfigPath": "apps/short-url-read-service/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/read-service",
+  "root": "apps/short-url-read-service",
   "projects": {
     "auth-service": {
       "type": "application",
@@ -56,14 +56,14 @@
         "tsConfigPath": "libs/prisma/tsconfig.lib.json"
       }
     },
-    "read-service": {
+    "short-url-read-service": {
       "type": "application",
-      "root": "apps/read-service",
+      "root": "apps/short-url-read-service",
       "entryFile": "main",
-      "exec": "OTEL_SERVICE_NAME=read-service node --env-file=.env --import ./instrumentation.mjs",
-      "sourceRoot": "apps/read-service/src",
+      "exec": "OTEL_SERVICE_NAME=short-url-read-service node --env-file=.env --import ./instrumentation.mjs",
+      "sourceRoot": "apps/short-url-read-service/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/read-service/tsconfig.app.json"
+        "tsConfigPath": "apps/short-url-read-service/tsconfig.app.json"
       }
     },
     "validation": {
@@ -75,14 +75,14 @@
         "tsConfigPath": "libs/validation/tsconfig.lib.json"
       }
     },
-    "write-service": {
+    "short-url-write-service": {
       "type": "application",
-      "root": "apps/write-service",
+      "root": "apps/short-url-write-service",
       "entryFile": "main",
-      "exec": "OTEL_SERVICE_NAME=write-service node --env-file=.env --import ./instrumentation.mjs",
-      "sourceRoot": "apps/write-service/src",
+      "exec": "OTEL_SERVICE_NAME=short-url-write-service node --env-file=.env --import ./instrumentation.mjs",
+      "sourceRoot": "apps/short-url-write-service/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/write-service/tsconfig.app.json"
+        "tsConfigPath": "apps/short-url-write-service/tsconfig.app.json"
       }
     }
   }

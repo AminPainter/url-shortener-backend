@@ -35,10 +35,10 @@
       "path": "./apps/auth-service/tsconfig.app.json"
     },
     {
-      "path": "./apps/read-service/tsconfig.app.json"
+      "path": "./apps/short-url-read-service/tsconfig.app.json"
     },
     {
-      "path": "./apps/write-service/tsconfig.app.json"
+      "path": "./apps/short-url-write-service/tsconfig.app.json"
     },
     {
       "path": "./libs/cache/tsconfig.lib.json"

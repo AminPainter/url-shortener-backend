@@ -28,7 +28,7 @@ services:
         paths: ['~/api/auth/login$']
         strip_path: false
 
-  - name: write-service
+  - name: short-url-write-service
     url: http://host.docker.internal:9112
     routes:
       - name: write-health
@@ -40,7 +40,7 @@ services:
         paths: ['~/api/short-urls$']
         strip_path: false
 
-  - name: read-service
+  - name: short-url-read-service
     url: http://host.docker.internal:9111
     routes:
       - name: read-health

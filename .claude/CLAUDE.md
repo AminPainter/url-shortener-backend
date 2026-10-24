@@ -20,9 +20,15 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 - pnpm only. Never use npm or yarn, even when a tool's output suggests an `npm install` command.
 
 ## Architecture
-- `apps/read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
-- `apps/write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`.
+- `apps/short-url-read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
+- `apps/short-url-write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`.
 - `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). Only auth-service holds the private key; verifiers get the public key only.
+- Folder structure: feature modules with type subfolders.
+  - `src/` root holds only `main.ts` and the root `<app>.module.ts`. The root module is composition only: `ConfigModule.forRoot`, `PinoLoggerModule`, `APP_FILTER`/`APP_PIPE`, and the feature module imports. It declares no controllers or other providers.
+  - Each feature gets a folder with `<feature>.module.ts` at its root and type subfolders for what it contains: `controllers/`, `services/`, `repositories/`, `strategies/`, `dto/`, `errors/`. Only create a subfolder when the feature has a file of that type.
+  - Feature modules import the infra libs they use (`PrismaModule`, `RedisCacheModule`) themselves and export only what another module consumes (e.g. auth-service `UsersModule` exports `UsersRepository` to `AuthModule`).
+  - New feature: new folder plus module, imported by the root module.
+  - Current features: short-url-read-service `health`, `redirect`; short-url-write-service `health`, `auth` (`JwtStrategy`), `short-urls`; auth-service `health`, `users`, `auth`.
 - Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject `PrismaService`; services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
 - Error handling:
   - Repositories are the only place that catches infrastructure (Prisma) errors. They rethrow them as domain errors and rethrow everything else untouched.
@@ -68,8 +74,8 @@ Host ports start at 9111:
 
 | Port | What |
 |---|---|
-| 9111 | read-service (`READ_SERVICE_PORT`) |
-| 9112 | write-service (`WRITE_SERVICE_PORT`) |
+| 9111 | short-url-read-service (`READ_SERVICE_PORT`) |
+| 9112 | short-url-write-service (`WRITE_SERVICE_PORT`) |
 | 9113 | Kong proxy, the public entry point |
 | 9114 | Kong admin (localhost only) |
 | 9115 | Postgres (`DATABASE_URL`, db `url_shortener`) |
@@ -83,16 +89,16 @@ New host ports continue sequentially from 9120.
 ## Commands
 ```
 pnpm infra:up / pnpm infra:down
-pnpm start:read / pnpm start:write / pnpm start:auth
-pnpm build read-service | write-service | auth-service
+pnpm start:short-url-read / pnpm start:short-url-write / pnpm start:auth
+pnpm build short-url-read-service | short-url-write-service | auth-service
 pnpm test        # unit, *.spec.ts
 pnpm test:e2e    # *.e2e-spec.ts, using Fastify app.inject
 pnpm lint        # oxlint --type-aware
 ```
 
 Health checks through Kong:
-- `curl localhost:9113/health` (read-service)
-- `curl localhost:9113/api/health` (write-service)
+- `curl localhost:9113/health` (short-url-read-service)
+- `curl localhost:9113/api/health` (short-url-write-service)
 - `curl localhost:9113/api/auth/health` (auth-service)
 
 ## Observability
@@ -117,7 +123,7 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
@@ -136,7 +142,7 @@ Health checks through Kong:
     - Not found: not cached, every miss goes to Postgres. `undefined` from `get` means ask the DB.
     - Fails open to Postgres when Redis is down (`disableOfflineQueue`, `throwOnConnectError: false`).
     - No in-process L1 tier and no TTL jitter, by decision.
-    - Planned: write-service imports `RedisCacheModule` and deletes the key when a link is deleted or changed.
+    - Planned: short-url-write-service imports `RedisCacheModule` and deletes the key when a link is deleted or changed.
 
 ## TODO
 - Figure out test organisation for this Nest microservices monorepo. Today each app has a single `test/app.e2e-spec.ts` covering every route, and there are no unit specs. Decide: one e2e file per feature or controller, whether services get `*.spec.ts` unit tests next to the source, where cross-service flows through Kong are tested, and shared test bootstrap/fixtures (app setup, random short codes, DB and Redis cleanup).
@@ -147,7 +153,7 @@ Health checks through Kong:
 - Prisma ORM 7, pinned (`prisma@7.10.1`). npm `latest` is the Prisma 8 RC with a different API; never install unpinned.
 - Schema `prisma/schema.prisma`, config `prisma.config.ts` (loads `.env` via `process.loadEnvFile()`).
 - `prisma-client` generator writes to `libs/prisma/src/generated/prisma` (gitignored, lint-ignored). `postinstall` runs `prisma generate`.
-- Driver adapter `@prisma/adapter-pg`. Prisma connects lazily, so tests boot without a DB, but write-service e2e needs `pnpm infra:up` and applied migrations.
+- Driver adapter `@prisma/adapter-pg`. Prisma connects lazily, so tests boot without a DB, but short-url-write-service e2e needs `pnpm infra:up` and applied migrations.
 - After schema changes: `pnpm exec prisma generate` (`migrate dev` does not regenerate).
 - `migrate dev` aborts in non-interactive shells when it raises a warning. Generate the SQL with `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`, save it as `prisma/migrations/<UTC timestamp>_<name>/migration.sql`, then `pnpm exec prisma migrate deploy`.
 
