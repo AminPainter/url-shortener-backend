@@ -31,6 +31,9 @@
   "files": [],
   "references": [
     {
+      "path": "./apps/auth-service/tsconfig.app.json"
+    },
+    {
       "path": "./apps/read-service/tsconfig.app.json"
     },
     {

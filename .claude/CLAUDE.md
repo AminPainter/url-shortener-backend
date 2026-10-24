@@ -21,7 +21,9 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 
 ## Architecture
 - `apps/read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
-- `apps/write-service`: everything under the global prefix `/api`.
+- `apps/write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`.
+- `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). Only auth-service holds the private key; verifiers get the public key only.
+- Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject `PrismaService`; services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
 - `libs/`: shared code, one Nest library per concern. Single root `package.json`; libs are path aliases bundled into each app, not workspace packages.
   - Shared contracts and infra plumbing only.
   - Never business logic, and never one service importing another service's internals.
@@ -34,7 +36,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - If the lib uses decorators, add its `tsconfig.lib.json` to the root `tsconfig.json` `references`, or Vitest leaves the decorators untransformed (SyntaxError).
   - Current libs:
     - `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
-    - `@app/prisma` (`PrismaModule`, `PrismaService`), imported by both apps.
+    - `@app/prisma` (`PrismaModule`, `PrismaService`, `Prisma` namespace for error types), imported by every app.
     - `@app/cache` (`RedisCacheModule`): Nest `CacheModule` on Redis via `@keyv/redis`; inject with `@Inject(CACHE_MANAGER) cache: Cache`. Owns the `short-url:` key namespace; TTL policy stays in the app.
     - `@app/logger` (`PinoLoggerModule`, `Logger`): nestjs-pino. Each app imports `PinoLoggerModule` and calls `app.useLogger(app.get(Logger))` with `bufferLogs: true`.
 - Kong (DB-less) is the only gateway, configured in `infra/kong/kong.yml`:
@@ -62,14 +64,15 @@ Host ports start at 9111:
 | 9116 | Redis (`REDIS_URL`, `allkeys-lru`, 256mb) |
 | 9117 | Grafana UI (localhost only, admin/admin) |
 | 9118 | OTLP HTTP into otel-lgtm (localhost only, `OTEL_EXPORTER_OTLP_ENDPOINT`) |
+| 9119 | auth-service (`AUTH_SERVICE_PORT`) |
 
-New host ports continue sequentially from 9119.
+New host ports continue sequentially from 9120.
 
 ## Commands
 ```
 pnpm infra:up / pnpm infra:down
-pnpm start:read / pnpm start:write
-pnpm build read-service | write-service
+pnpm start:read / pnpm start:write / pnpm start:auth
+pnpm build read-service | write-service | auth-service
 pnpm test        # unit, *.spec.ts
 pnpm test:e2e    # *.e2e-spec.ts, using Fastify app.inject
 pnpm lint        # oxlint --type-aware
@@ -78,6 +81,7 @@ pnpm lint        # oxlint --type-aware
 Health checks through Kong:
 - `curl localhost:9113/health` (read-service)
 - `curl localhost:9113/api/health` (write-service)
+- `curl localhost:9113/api/auth/health` (auth-service)
 
 ## Observability
 - OpenTelemetry starts from `instrumentation.mjs` at the repo root, a plain ESM preload outside Rspack.
@@ -101,17 +105,16 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
-  - Auth.
+  - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
   - Kong plugins other than `opentelemetry`.
   - App Dockerfiles and CI.
+- `ShortUrl.userId` is a nullable indexed `BigInt` with no FK to `User`, by decision: `User` belongs to auth-service. Rows created before auth have `userId` null.
 - Planned data model additions to `ShortUrl`:
   - `shortCode` also holds custom aliases.
   - `expiresAt?`.
-  - `userId?`.
-  - Plus a `User` table.
 - Planned behaviour:
   - Short codes: random 7-character base62, no retry on a unique-key clash (a clash returns 500).
   - Redirects are 302, not 301, so clicks stay measurable.
@@ -143,6 +146,6 @@ Health checks through Kong:
 
 ## Gotchas
 - Host port 6379 may belong to another project's Redis. `REDIS_URL` must point at 9116.
-- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
+- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `AUTH_SERVICE_PORT`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (both base64 of a PEM), `DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
 - After changing `.env`, restart the service; watch mode does not reload env.
 - A Kong 502 means the target service is not running or is on the wrong port.

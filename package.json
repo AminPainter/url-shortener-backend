@@ -18,6 +18,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "start:read": "nest start read-service --watch",
     "start:write": "nest start write-service --watch",
+    "start:auth": "nest start auth-service --watch",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
     "postinstall": "prisma generate"
@@ -29,6 +30,8 @@
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "12.0.3",
+    "@nestjs/passport": "12.0.0",
     "@nestjs/platform-fastify": "^12.2.0",
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/instrumentation": "0.300.0",
@@ -39,9 +42,13 @@
     "@opentelemetry/sdk-node": "0.300.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "bcrypt": "6.0.0",
     "cache-manager": "7.2.9",
     "keyv": "^5.6.0",
     "nestjs-pino": "^5.3.1",
+    "passport": "0.7.0",
+    "passport-jwt": "4.0.1",
+    "passport-local": "1.0.0",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
@@ -54,7 +61,10 @@
     "@nestjs/schematics": "^12.0.0",
     "@nestjs/testing": "^12.0.1",
     "@rspack/core": "^2.2.9",
+    "@types/bcrypt": "6.0.0",
     "@types/node": "^24.0.0",
+    "@types/passport-jwt": "4.0.1",
+    "@types/passport-local": "1.0.38",
     "@vitest/coverage-v8": "^4.1.2",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",
@@ -71,6 +81,7 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "@prisma/engines",
+      "bcrypt",
       "prisma"
     ]
   }
