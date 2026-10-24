@@ -35,10 +35,13 @@ export class ZodValidationPipe implements PipeTransform {
     if (!isZodDto(metatype)) return value;
     const result = metatype.schema.safeParse(value);
     if (!result.success) {
-      throw new BadRequestException({
-        message: 'Validation failed',
-        errors: z.flattenError(result.error).fieldErrors,
-      });
+      throw new BadRequestException(
+        {
+          message: 'Validation failed',
+          errors: z.flattenError(result.error).fieldErrors,
+        },
+        { errorCode: 'VALIDATION_FAILED' },
+      );
     }
     return result.data;
   }

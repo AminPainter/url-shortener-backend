@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { ErrorResponseFilter } from '@app/errors';
 import { PinoLoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { ZodValidationPipe } from '@app/validation';
@@ -20,6 +21,7 @@ import { ShortUrlsService } from './short-urls.service';
   ],
   controllers: [HealthController, ShortUrlsController],
   providers: [
+    { provide: APP_FILTER, useClass: ErrorResponseFilter },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     JwtStrategy,
     ShortUrlsService,

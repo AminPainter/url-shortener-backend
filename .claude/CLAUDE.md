@@ -24,6 +24,17 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 - `apps/write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`.
 - `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). Only auth-service holds the private key; verifiers get the public key only.
 - Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject `PrismaService`; services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
+- Error handling:
+  - Repositories are the only place that catches infrastructure (Prisma) errors. They rethrow them as domain errors and rethrow everything else untouched.
+  - Services throw `DomainError` subclasses from `@app/errors` and never return `null` for "not found". They never import or throw Nest HTTP exceptions.
+  - Each domain error extends a transport-neutral category (`NotFoundError`, `ConflictError`) and declares a `code`. Add a category to the lib, and map it in the filter, only when a concrete error needs it.
+  - Controllers, guards, pipes and Passport strategies are the HTTP layer. They may throw Nest `HttpException`s and pass `{ errorCode }` when the meaning is more specific than the status.
+  - No try/catch in controllers. Each app registers `{ provide: APP_FILTER, useClass: ErrorResponseFilter }`, which is the only place an error becomes an HTTP response.
+  - Every error response is `{ statusCode, message, errorCode, ...extra }`.
+    - `errorCode` is the domain error's `code`, else the `HttpException`'s `errorCode`, else the `HttpStatus` name (e.g. `UNAUTHORIZED`).
+    - Codes are stable SCREAMING_SNAKE_CASE; renaming one is a breaking change for the frontend.
+  - Unknown errors return a generic 500 (`INTERNAL_SERVER_ERROR`) and are logged once with their stack. `HttpException`s are not logged.
+  - Nest 12's Fastify adapter already turns `FastifyError`s (bad JSON, body too large) into `HttpException`s that keep Fastify's message.
 - `libs/`: shared code, one Nest library per concern. Single root `package.json`; libs are path aliases bundled into each app, not workspace packages.
   - Shared contracts and infra plumbing only.
   - Never business logic, and never one service importing another service's internals.
@@ -39,6 +50,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - `@app/prisma` (`PrismaModule`, `PrismaService`, `Prisma` namespace for error types), imported by every app.
     - `@app/cache` (`RedisCacheModule`): Nest `CacheModule` on Redis via `@keyv/redis`; inject with `@Inject(CACHE_MANAGER) cache: Cache`. Owns the `short-url:` key namespace; TTL policy stays in the app.
     - `@app/logger` (`PinoLoggerModule`, `Logger`): nestjs-pino. Each app imports `PinoLoggerModule` and calls `app.useLogger(app.get(Logger))` with `bufferLogs: true`.
+    - `@app/errors` (`DomainError`, `NotFoundError`, `ConflictError`, `ErrorResponseFilter`): domain error base classes and the global `@Catch()` filter that turns any error into the HTTP error body.
 - Kong (DB-less) is the only gateway, configured in `infra/kong/kong.yml`:
   - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
@@ -105,7 +117,7 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
@@ -127,8 +139,6 @@ Health checks through Kong:
     - Planned: write-service imports `RedisCacheModule` and deletes the key when a link is deleted or changed.
 
 ## TODO
-- Add a global exception filter (`APP_FILTER`) to each app, shared through a lib, that translates domain exceptions into HTTP responses.
-- Make the service layer always throw domain exceptions (e.g. `ShortUrlNotFoundError`), never return `null` for "not found" and never throw Nest HTTP exceptions. Only the exception filter translates them to HTTP. Today `RedirectService.resolve` returns `null` and `RedirectController` throws `NotFoundException`; migrate it when the filter lands.
 - Figure out test organisation for this Nest microservices monorepo. Today each app has a single `test/app.e2e-spec.ts` covering every route, and there are no unit specs. Decide: one e2e file per feature or controller, whether services get `*.spec.ts` unit tests next to the source, where cross-service flows through Kong are tested, and shared test bootstrap/fixtures (app setup, random short codes, DB and Redis cleanup).
 - Monitor the health of every service and its dependencies. Keep `/health` as liveness only; add a readiness endpoint per app (with its own Kong route) that pings Postgres (503 when down) and reports Redis as degraded without failing readiness. Wire it into whatever monitoring/alerting we adopt.
 - Make sure Postgres is connected before an app serves users: today Prisma and Redis both connect lazily on the first request. Connect and verify Postgres during bootstrap (fail startup if unreachable) before `app.listen`. Redis must not block startup (it is a cache; fail open), but warm its connection at boot and log a warning when it is down.

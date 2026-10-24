@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
-import { APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ErrorResponseFilter } from '@app/errors';
 import { PinoLoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { ZodValidationPipe } from '@app/validation';
@@ -35,6 +36,7 @@ import { UsersRepository } from './users.repository';
   ],
   controllers: [HealthController, AuthController],
   providers: [
+    { provide: APP_FILTER, useClass: ErrorResponseFilter },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     AuthService,
     UsersRepository,

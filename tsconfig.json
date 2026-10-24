@@ -19,6 +19,7 @@
     "strictPropertyInitialization": false,
     "paths": {
       "@app/cache": ["./libs/cache/src"],
+      "@app/errors": ["./libs/errors/src"],
       "@app/logger": ["./libs/logger/src"],
       "@app/prisma": ["./libs/prisma/src"],
       "@app/validation": ["./libs/validation/src"]
@@ -41,6 +42,9 @@
     },
     {
       "path": "./libs/cache/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/errors/tsconfig.lib.json"
     },
     {
       "path": "./libs/prisma/tsconfig.lib.json"

@@ -76,12 +76,21 @@ describe('WriteService (e2e)', () => {
     async (payload) => {
       const response = await createShortUrl(payload, `Bearer ${accessToken}`);
       expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        statusCode: 400,
+        errorCode: 'VALIDATION_FAILED',
+      });
     },
   );
 
   it('POST /api/short-urls rejects a missing token', async () => {
     const response = await createShortUrl({ longUrl: 'https://glomo.one' });
     expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'Unauthorized',
+      errorCode: 'UNAUTHORIZED',
+    });
   });
 
   it('POST /api/short-urls rejects a malformed token', async () => {
@@ -90,6 +99,11 @@ describe('WriteService (e2e)', () => {
       'Bearer not-a-jwt',
     );
     expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'Unauthorized',
+      errorCode: 'UNAUTHORIZED',
+    });
   });
 
   it('POST /api/short-urls rejects an HS256 token', async () => {
@@ -101,6 +115,11 @@ describe('WriteService (e2e)', () => {
       `Bearer ${forgedToken}`,
     );
     expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'Unauthorized',
+      errorCode: 'UNAUTHORIZED',
+    });
   });
 
   afterEach(async () => {

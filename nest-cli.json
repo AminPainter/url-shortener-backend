@@ -29,6 +29,15 @@
         "tsConfigPath": "libs/cache/tsconfig.lib.json"
       }
     },
+    "errors": {
+      "type": "library",
+      "root": "libs/errors",
+      "entryFile": "index",
+      "sourceRoot": "libs/errors/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/errors/tsconfig.lib.json"
+      }
+    },
     "logger": {
       "type": "library",
       "root": "libs/logger",

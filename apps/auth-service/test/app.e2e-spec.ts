@@ -55,6 +55,11 @@ describe('AuthService (e2e)', () => {
     await signup({ email, password: 'correct-horse' });
     const response = await signup({ email, password: 'another-pass' });
     expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      statusCode: 409,
+      message: 'Conflict',
+      errorCode: 'EMAIL_TAKEN',
+    });
   });
 
   it.each([
@@ -64,6 +69,28 @@ describe('AuthService (e2e)', () => {
   ])('POST /api/auth/signup rejects %j', async (payload) => {
     const response = await signup(payload);
     expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      statusCode: 400,
+      message: 'Validation failed',
+      errors: expect.any(Object),
+      errorCode: 'VALIDATION_FAILED',
+    });
+  });
+
+  it('POST /api/auth/signup rejects a malformed JSON body', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/signup',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"email":',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      statusCode: 400,
+      message:
+        "Body is not valid JSON but content-type is set to 'application/json'",
+      errorCode: 'BAD_REQUEST',
+    });
   });
 
   it('POST /api/auth/login returns an RS256 token for the user', async () => {
@@ -91,6 +118,11 @@ describe('AuthService (e2e)', () => {
     await signup({ email, password: 'correct-horse' });
     const response = await login({ email, password: 'wrong-password' });
     expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'Unauthorized',
+      errorCode: 'INVALID_CREDENTIALS',
+    });
   });
 
   it('POST /api/auth/signup treats email case-insensitively', async () => {
@@ -111,6 +143,11 @@ describe('AuthService (e2e)', () => {
   it('POST /api/auth/login rejects an unknown user', async () => {
     const response = await login({ email, password: 'correct-horse' });
     expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'Unauthorized',
+      errorCode: 'INVALID_CREDENTIALS',
+    });
   });
 
   afterEach(async () => {

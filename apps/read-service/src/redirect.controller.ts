@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Redirect,
-} from '@nestjs/common';
+import { Controller, Get, Param, Redirect } from '@nestjs/common';
 import { RedirectService } from './redirect.service';
 
 @Controller()
@@ -15,7 +9,6 @@ export class RedirectController {
   @Redirect()
   async redirect(@Param('shortCode') shortCode: string) {
     const longUrl = await this.redirectService.resolve(shortCode);
-    if (!longUrl) throw new NotFoundException();
     return { url: longUrl, statusCode: 302 };
   }
 }

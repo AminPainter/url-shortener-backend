@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   HttpCode,
   Post,
@@ -10,7 +9,6 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService, type AuthenticatedUser } from './auth.service';
 import { CredentialsDto } from './credentials.dto';
-import { EmailTakenError } from './email-taken.error';
 
 @Controller()
 export class AuthController {
@@ -18,13 +16,8 @@ export class AuthController {
 
   @Post('signup')
   async signup(@Body() { email, password }: CredentialsDto) {
-    try {
-      const user = await this.authService.signup(email, password);
-      return { id: user.id.toString(), email: user.email };
-    } catch (error) {
-      if (error instanceof EmailTakenError) throw new ConflictException();
-      throw error;
-    }
+    const user = await this.authService.signup(email, password);
+    return { id: user.id.toString(), email: user.email };
   }
 
   @Post('login')

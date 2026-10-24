@@ -79,6 +79,11 @@ describe('ReadService (e2e)', () => {
   it('GET /:code returns 404 for an unknown code', async () => {
     const res = await app.inject({ method: 'GET', url: '/zzzzzzz' });
     expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      statusCode: 404,
+      message: 'Not Found',
+      errorCode: 'SHORT_URL_NOT_FOUND',
+    });
   });
 
   afterEach(async () => {
