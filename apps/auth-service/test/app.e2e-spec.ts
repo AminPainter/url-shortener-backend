@@ -6,7 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '@app/prisma';
+import { AuthDbService } from '@app/auth-db';
 import { AuthServiceModule } from './../src/auth-service.module';
 
 describe('AuthService (e2e)', () => {
@@ -94,9 +94,7 @@ describe('AuthService (e2e)', () => {
   });
 
   it('POST /api/auth/login returns an RS256 token for the user', async () => {
-    const { id } = (
-      await signup({ email, password: 'correct-horse' })
-    ).json();
+    const { id } = (await signup({ email, password: 'correct-horse' })).json();
 
     const response = await login({ email, password: 'correct-horse' });
     expect(response.statusCode).toBe(200);
@@ -150,8 +148,14 @@ describe('AuthService (e2e)', () => {
     });
   });
 
+  it('cannot read the shorturls schema', async () => {
+    await expect(
+      app.get(AuthDbService).$queryRaw`SELECT 1 FROM shorturls.short_urls`,
+    ).rejects.toThrow(/permission denied/i);
+  });
+
   afterEach(async () => {
-    await app.get(PrismaService).user.deleteMany({ where: { email } });
+    await app.get(AuthDbService).user.deleteMany({ where: { email } });
     await app.close();
   });
 });

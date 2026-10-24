@@ -18,10 +18,11 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "paths": {
+      "@app/auth-db": ["./libs/auth-db/src"],
       "@app/cache": ["./libs/cache/src"],
       "@app/errors": ["./libs/errors/src"],
       "@app/logger": ["./libs/logger/src"],
-      "@app/prisma": ["./libs/prisma/src"],
+      "@app/short-urls-db": ["./libs/short-urls-db/src"],
       "@app/validation": ["./libs/validation/src"]
     },
     "types": [
@@ -47,7 +48,10 @@
       "path": "./libs/errors/tsconfig.lib.json"
     },
     {
-      "path": "./libs/prisma/tsconfig.lib.json"
+      "path": "./libs/auth-db/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/short-urls-db/tsconfig.lib.json"
     },
     {
       "path": "./libs/validation/tsconfig.lib.json"

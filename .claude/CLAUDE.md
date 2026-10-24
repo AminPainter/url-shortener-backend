@@ -14,8 +14,8 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
   - ESM with extensionless relative imports (`moduleResolution: bundler`; Rspack bundles each app). `nest g` still emits `.js` suffixes, so strip them. Import libs via `@app/<name>`, never `../../libs/...`.
   - Fastify, not Express.
   - Config through `ConfigService.getOrThrow<T>()`.
-  - Never use one-word variable or parameter names (`cached`, `row`, `url`, `res`, `config`), except `prisma` for `PrismaService`. Name what the value holds: `cachedLongUrl`, `shortUrl`, `longUrl`, `response`, `configService`.
-  - Name every injected instance field after its type in camelCase: `private readonly redirectService: RedirectService`, `cache: Cache`. No shortened or pluralised names like `redirects`. Exception: `PrismaService` is always injected as `prisma`.
+  - Never use one-word variable or parameter names (`cached`, `row`, `url`, `res`, `config`), except `prisma` for a DB client (`AuthDbService`, `ShortUrlsDbService`). Name what the value holds: `cachedLongUrl`, `shortUrl`, `longUrl`, `response`, `configService`.
+  - Name every injected instance field after its type in camelCase: `private readonly redirectService: RedirectService`, `cache: Cache`. No shortened or pluralised names like `redirects`. Exception: DB clients (`AuthDbService`, `ShortUrlsDbService`) are always injected as `prisma`.
 - Avoid mocks in tests. Exercise real code paths against the Docker Compose infra (Postgres, Redis, Kong). Mock only what cannot run locally, such as third-party external APIs, and clean up any data a test creates.
 - pnpm only. Never use npm or yarn, even when a tool's output suggests an `npm install` command.
 
@@ -26,10 +26,10 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 - Folder structure: feature modules with type subfolders.
   - `src/` root holds only `main.ts` and the root `<app>.module.ts`. The root module is composition only: `ConfigModule.forRoot`, `PinoLoggerModule`, `APP_FILTER`/`APP_PIPE`, and the feature module imports. It declares no controllers or other providers.
   - Each feature gets a folder with `<feature>.module.ts` at its root and type subfolders for what it contains: `controllers/`, `services/`, `repositories/`, `strategies/`, `dto/`, `errors/`. Only create a subfolder when the feature has a file of that type.
-  - Feature modules import the infra libs they use (`PrismaModule`, `RedisCacheModule`) themselves and export only what another module consumes (e.g. auth-service `UsersModule` exports `UsersRepository` to `AuthModule`).
+  - Feature modules import the infra libs they use (`AuthDbModule`, `ShortUrlsDbModule.forRoot(...)`, `RedisCacheModule`) themselves and export only what another module consumes (e.g. auth-service `UsersModule` exports `UsersRepository` to `AuthModule`).
   - New feature: new folder plus module, imported by the root module.
   - Current features: short-url-read-service `health`, `redirect`; short-url-write-service `health`, `auth` (`JwtStrategy`), `short-urls`; auth-service `health`, `users`, `auth`.
-- Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject `PrismaService`; services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
+- Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject a DB client (`AuthDbService`, `ShortUrlsDbService`); services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
 - Error handling:
   - Repositories are the only place that catches infrastructure (Prisma) errors. They rethrow them as domain errors and rethrow everything else untouched.
   - Services throw `DomainError` subclasses from `@app/errors` and never return `null` for "not found". They never import or throw Nest HTTP exceptions.
@@ -53,7 +53,8 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - If the lib uses decorators, add its `tsconfig.lib.json` to the root `tsconfig.json` `references`, or Vitest leaves the decorators untransformed (SyntaxError).
   - Current libs:
     - `@app/validation` (`ZodValidationPipe`: `@Body(new ZodValidationPipe(schema))`).
-    - `@app/prisma` (`PrismaModule`, `PrismaService`, `Prisma` namespace for error types), imported by every app.
+    - `@app/auth-db` (`AuthDbModule`, `AuthDbService`, `Prisma` namespace for error types): Prisma client for the `auth` schema, imported only by auth-service.
+    - `@app/short-urls-db` (`ShortUrlsDbModule.forRoot({ urlKey })`, `ShortUrlsDbService`, `Prisma`): Prisma client for the `shorturls` schema, imported only by short-url-write-service (`SHORT_URLS_WRITE_DATABASE_URL`) and short-url-read-service (`SHORT_URLS_READ_DATABASE_URL`).
     - `@app/cache` (`RedisCacheModule`): Nest `CacheModule` on Redis via `@keyv/redis`; inject with `@Inject(CACHE_MANAGER) cache: Cache`. Owns the `short-url:` key namespace; TTL policy stays in the app.
     - `@app/logger` (`PinoLoggerModule`, `Logger`): nestjs-pino. Each app imports `PinoLoggerModule` and calls `app.useLogger(app.get(Logger))` with `bufferLogs: true`.
     - `@app/errors` (`DomainError`, `NotFoundError`, `ConflictError`, `ErrorResponseFilter`): domain error base classes and the global `@Catch()` filter that turns any error into the HTTP error body.
@@ -85,7 +86,7 @@ Host ports start at 9111:
 | 9112 | short-url-write-service (`WRITE_SERVICE_PORT`) |
 | 9113 | Kong proxy, the public entry point |
 | 9114 | Kong admin (localhost only) |
-| 9115 | Postgres (`DATABASE_URL`, db `url_shortener`) |
+| 9115 | Postgres (db `url_shortener`; schemas `auth`, `shorturls`; one role per service) |
 | 9116 | Redis (`REDIS_URL`, `allkeys-lru`, 256mb) |
 | 9117 | Grafana UI (localhost only, admin/admin) |
 | 9118 | OTLP HTTP into otel-lgtm (localhost only, `OTEL_EXPORTER_OTLP_ENDPOINT`) |
@@ -136,7 +137,7 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, per-service Postgres schemas and roles, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
@@ -164,17 +165,23 @@ Health checks through Kong:
 
 ## Prisma
 - Prisma ORM 7, pinned (`prisma@7.10.1`). npm `latest` is the Prisma 8 RC with a different API; never install unpinned.
-- Schema `prisma/schema.prisma`, config `prisma.config.ts` (loads `.env` via `process.loadEnvFile()`).
-- `prisma-client` generator writes to `libs/prisma/src/generated/prisma` (gitignored, lint-ignored). `postinstall` runs `prisma generate`.
-- Driver adapter `@prisma/adapter-pg`. Prisma connects lazily, so tests boot without a DB, but short-url-write-service e2e needs `pnpm infra:up` and applied migrations.
-- After schema changes: `pnpm exec prisma generate` (`migrate dev` does not regenerate).
-- `migrate dev` aborts in non-interactive shells when it raises a warning. Generate the SQL with `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`, save it as `prisma/migrations/<UTC timestamp>_<name>/migration.sql`, then `pnpm exec prisma migrate deploy`.
+- One Postgres schema per service boundary, each with its own Prisma schema, config, migration history and generated client:
+  - `auth`: `prisma/auth/schema.prisma`, `prisma.auth.config.ts`, `prisma/auth/migrations`, client in `libs/auth-db/src/generated/prisma`.
+  - `shorturls`: `prisma/short-urls/schema.prisma`, `prisma.short-urls.config.ts`, `prisma/short-urls/migrations`, client in `libs/short-urls-db/src/generated/prisma`.
+- Boundary rules: an app imports only its own `*-db` lib; no cross-schema relations or foreign keys (`ShortUrl.userId` is a plain column); tables and columns are snake_case via `@@map`/`@map`.
+- Runtime roles (created by `infra/postgres/init/01-schemas-and-roles.sql` on an empty volume): `auth_svc` (CRUD on `auth`), `shorturls_writer` (CRUD on `shorturls`), `shorturls_reader` (SELECT on `shorturls`). Grants come from default privileges, so new tables are covered automatically. Each app's e2e asserts it gets `permission denied` on the other schema.
+- Migrations run as `postgres` via `DATABASE_ADMIN_URL`; each config appends `?schema=<name>`, so each `_prisma_migrations` table lives in its own schema.
+- Configs load `.env` via `process.loadEnvFile()`. `postinstall` generates both clients.
+- Driver adapter `@prisma/adapter-pg` with `{ schema }` set per lib. Prisma connects lazily, so tests boot without a DB, but e2e needs `pnpm infra:up` and `pnpm db:migrate`.
+- After schema changes: `pnpm exec prisma generate --config prisma.<auth|short-urls>.config.ts`.
+- `migrate dev` aborts in non-interactive shells when it raises a warning. Generate the SQL with `pnpm exec prisma migrate diff --config prisma.<x>.config.ts --from-config-datasource --to-schema prisma/<x>/schema.prisma --script`, save it as `prisma/<x>/migrations/<UTC timestamp>_<name>/migration.sql`, then `pnpm db:migrate`.
+- `pnpm db:reset` drops the Postgres volume, re-runs the init script and applies both histories (local only).
 
 ## Cache packages
 - Pinned set: `cache-manager@7.2.9`, `@keyv/redis@5.1.6`, `keyv@^5.6.0`. `@keyv/redis@6` needs keyv 6 and clashes with cache-manager 7; do not upgrade one alone.
 
 ## Gotchas
 - Host port 6379 may belong to another project's Redis. `REDIS_URL` must point at 9116.
-- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `AUTH_SERVICE_PORT`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (both base64 of a PEM), `DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
+- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `AUTH_SERVICE_PORT`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (both base64 of a PEM), `DATABASE_ADMIN_URL`, `AUTH_DATABASE_URL`, `SHORT_URLS_WRITE_DATABASE_URL`, `SHORT_URLS_READ_DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
 - After changing `.env`, restart the service; watch mode does not reload env.
 - A Kong 502 means the target service is not running or is on the wrong port.

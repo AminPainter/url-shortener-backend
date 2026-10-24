@@ -9,6 +9,7 @@ The Nest apps run on the host; Postgres, Redis and Kong run in Docker.
 cp .env.example .env
 pnpm install
 pnpm infra:up        # kong :9113 (admin :9114), postgres :9115, redis :9116
+pnpm db:migrate      # apply the auth and shorturls schema migrations
 pnpm dev             # all apps in mprocs: read :9111, write :9112, auth :9119
 
 curl localhost:9113/health        # short-url-read-service via Kong

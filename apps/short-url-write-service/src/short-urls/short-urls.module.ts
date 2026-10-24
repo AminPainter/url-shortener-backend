@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@app/prisma';
+import { ShortUrlsDbModule } from '@app/short-urls-db';
 import { ShortUrlsController } from './controllers/short-urls.controller';
 import { ShortUrlsRepository } from './repositories/short-urls.repository';
 import { ShortUrlsService } from './services/short-urls.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [
+    ShortUrlsDbModule.forRoot({ urlKey: 'SHORT_URLS_WRITE_DATABASE_URL' }),
+  ],
   controllers: [ShortUrlsController],
   providers: [ShortUrlsService, ShortUrlsRepository],
 })

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaService } from '@app/prisma';
+import { AuthDbService, Prisma } from '@app/auth-db';
 import { EmailTakenError } from '../errors/email-taken.error';
 
 @Injectable()
 export class UsersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: AuthDbService) {}
 
   async create(email: string, passwordHash: string) {
     try {

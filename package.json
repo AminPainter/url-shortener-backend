@@ -22,7 +22,9 @@
     "start:auth": "nest start auth-service --watch",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate --config prisma.auth.config.ts && prisma generate --config prisma.short-urls.config.ts",
+    "db:migrate": "prisma migrate deploy --config prisma.auth.config.ts && prisma migrate deploy --config prisma.short-urls.config.ts",
+    "db:reset": "docker compose down -v postgres &&docker compose up -d --wait postgres && pnpm db:migrate"
   },
   "dependencies": {
     "@fastify/otel": "0.21.3",

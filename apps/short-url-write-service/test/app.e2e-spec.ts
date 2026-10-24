@@ -6,7 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '@app/prisma';
+import { ShortUrlsDbService } from '@app/short-urls-db';
 import { ShortUrlWriteServiceModule } from './../src/short-url-write-service.module';
 
 describe('ShortUrlWriteService (e2e)', () => {
@@ -63,7 +63,7 @@ describe('ShortUrlWriteService (e2e)', () => {
       longUrl: 'https://example.com',
     });
 
-    const prisma = app.get(PrismaService);
+    const prisma = app.get(ShortUrlsDbService);
     const { shortCode } = response.json();
     const shortUrl = await prisma.shortUrl.findUnique({ where: { shortCode } });
     expect(shortUrl?.longUrl).toBe('https://example.com');
@@ -120,6 +120,12 @@ describe('ShortUrlWriteService (e2e)', () => {
       message: 'Unauthorized',
       errorCode: 'UNAUTHORIZED',
     });
+  });
+
+  it('cannot read the auth schema', async () => {
+    await expect(
+      app.get(ShortUrlsDbService).$queryRaw`SELECT 1 FROM auth.users`,
+    ).rejects.toThrow(/permission denied/i);
   });
 
   afterEach(async () => {

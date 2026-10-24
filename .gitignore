@@ -2,5 +2,6 @@ node_modules
 dist
 coverage
 .env
-libs/prisma/src/generated
+libs/auth-db/src/generated
+libs/short-urls-db/src/generated
 mprocs.log

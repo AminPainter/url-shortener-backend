@@ -47,15 +47,6 @@
         "tsConfigPath": "libs/logger/tsconfig.lib.json"
       }
     },
-    "prisma": {
-      "type": "library",
-      "root": "libs/prisma",
-      "entryFile": "index",
-      "sourceRoot": "libs/prisma/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/prisma/tsconfig.lib.json"
-      }
-    },
     "short-url-read-service": {
       "type": "application",
       "root": "apps/short-url-read-service",
@@ -83,6 +74,24 @@
       "sourceRoot": "apps/short-url-write-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/short-url-write-service/tsconfig.app.json"
+      }
+    },
+    "auth-db": {
+      "type": "library",
+      "root": "libs/auth-db",
+      "entryFile": "index",
+      "sourceRoot": "libs/auth-db/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/auth-db/tsconfig.lib.json"
+      }
+    },
+    "short-urls-db": {
+      "type": "library",
+      "root": "libs/short-urls-db",
+      "entryFile": "index",
+      "sourceRoot": "libs/short-urls-db/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/short-urls-db/tsconfig.lib.json"
       }
     }
   }

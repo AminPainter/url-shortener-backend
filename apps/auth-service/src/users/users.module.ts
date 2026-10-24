@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@app/prisma';
+import { AuthDbModule } from '@app/auth-db';
 import { UsersRepository } from './repositories/users.repository';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [AuthDbModule],
   providers: [UsersRepository],
   exports: [UsersRepository],
 })

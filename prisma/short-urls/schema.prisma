@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../../libs/short-urls-db/src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["shorturls"]
+}
+
+model ShortUrl {
+  id        BigInt   @id @default(autoincrement())
+  shortCode String   @unique @map("short_code")
+  longUrl   String   @map("long_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  userId    BigInt?  @map("user_id")
+
+  @@index([userId])
+  @@map("short_urls")
+  @@schema("shorturls")
+}

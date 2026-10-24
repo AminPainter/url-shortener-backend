@@ -4,12 +4,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleDestroy {
+export class AuthDbService extends PrismaClient implements OnModuleDestroy {
   constructor(config: ConfigService) {
     super({
-      adapter: new PrismaPg({
-        connectionString: config.getOrThrow<string>('DATABASE_URL'),
-      }),
+      adapter: new PrismaPg(
+        { connectionString: config.getOrThrow<string>('AUTH_DATABASE_URL') },
+        { schema: 'auth' },
+      ),
     });
   }
 
