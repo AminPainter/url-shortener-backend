@@ -21,7 +21,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 
 ## Architecture
 - `apps/short-url-read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
-- `apps/short-url-write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`.
+- `apps/short-url-write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`. `GET /api/short-urls?limit=&cursor=` (same JWT) lists the token user's links newest first as `{ items: [{ shortCode, longUrl, createdAt }], nextCursor }`; keyset pagination on `id` (`limit` 1-100, default 20), served by the `(user_id, id)` index.
 - `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). Only auth-service holds the private key; verifiers get the public key only.
 - Folder structure: feature modules with type subfolders.
   - `src/` root holds only `main.ts` and the root `<app>.module.ts`. The root module is composition only: `ConfigModule.forRoot`, `PinoLoggerModule`, `APP_FILTER`/`APP_PIPE`, and the feature module imports. It declares no controllers or other providers.
@@ -66,7 +66,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - `opentelemetry` sends traces to otel-lgtm and injects W3C `traceparent` upstream.
     - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app. It exposes `Retry-After` and `RateLimit-Limit/Remaining/Reset` so the frontend can read them.
     - `rate-limiting` is `limit_by: ip`, `policy: redis` on the compose `redis` service, db 1 (the cache uses db 0), and keeps the default `fault_tolerant: true`, so it fails open when Redis is down. Use the nested `redis:` block, not the deprecated `redis_host` fields. Kong still logs deprecation warnings for those fields at boot; ignore them.
-      - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; login 10/min and 100/h; signup 3/min and 20/h. Health routes are unlimited.
+      - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; list-short-urls 60/min and 1000/h; login 10/min and 100/h; signup 3/min and 20/h. Health routes are unlimited.
       - Preflights are not counted, because `cors` answers them before `rate-limiting` runs.
       - A 429 body is Kong's `{ message, request_id }`, with no `errorCode`. The frontend must handle 429 by status.
       - In prod, Kong needs `KONG_TRUSTED_IPS` and `KONG_REAL_IP_HEADER`, or every client shares the load balancer's IP.
@@ -137,7 +137,7 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, per-service Postgres schemas and roles, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, per-service Postgres schemas and roles, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, listing a user's short URLs, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.

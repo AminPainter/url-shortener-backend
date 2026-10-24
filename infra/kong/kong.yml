@@ -80,6 +80,22 @@ services:
                 port: 6379
                 database: 1
 
+      - name: list-short-urls
+        methods: [GET]
+        paths: ['~/api/short-urls$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              hour: 1000
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+
   - name: short-url-read-service
     url: http://host.docker.internal:9111
     routes:

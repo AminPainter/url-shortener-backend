@@ -15,7 +15,7 @@ model ShortUrl {
   createdAt DateTime @default(now()) @map("created_at")
   userId    BigInt?  @map("user_id")
 
-  @@index([userId])
+  @@index([userId, id])
   @@map("short_urls")
   @@schema("shorturls")
 }

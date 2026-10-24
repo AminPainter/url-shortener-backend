@@ -122,6 +122,82 @@ describe('ShortUrlWriteService (e2e)', () => {
     });
   });
 
+  const listShortUrls = (query: string, authorization?: string) =>
+    app.inject({
+      method: 'GET',
+      url: `/api/short-urls${query}`,
+      headers: authorization ? { authorization } : {},
+    });
+
+  it('GET /api/short-urls pages through only the token user links, newest first', async () => {
+    const prisma = app.get(ShortUrlsDbService);
+    const shortCodes = Array.from({ length: 3 }, () =>
+      randomInt(36 ** 6, 36 ** 7).toString(36),
+    );
+    for (const shortCode of shortCodes) {
+      await prisma.shortUrl.create({
+        data: {
+          shortCode,
+          longUrl: `https://example.com/${shortCode}`,
+          userId: BigInt(userId),
+        },
+      });
+    }
+    const otherShortCode = randomInt(36 ** 6, 36 ** 7).toString(36);
+    await prisma.shortUrl.create({
+      data: {
+        shortCode: otherShortCode,
+        longUrl: 'https://example.com',
+        userId: BigInt(userId) + 1n,
+      },
+    });
+
+    const firstPage = await listShortUrls('?limit=2', `Bearer ${accessToken}`);
+    expect(firstPage.statusCode).toBe(200);
+    expect(firstPage.json()).toEqual({
+      items: [shortCodes[2], shortCodes[1]].map((shortCode) => ({
+        shortCode,
+        longUrl: `https://example.com/${shortCode}`,
+        createdAt: expect.any(String),
+      })),
+      nextCursor: expect.stringMatching(/^\d+$/),
+    });
+
+    const secondPage = await listShortUrls(
+      `?limit=2&cursor=${firstPage.json().nextCursor}`,
+      `Bearer ${accessToken}`,
+    );
+    expect(secondPage.json()).toEqual({
+      items: [
+        {
+          shortCode: shortCodes[0],
+          longUrl: `https://example.com/${shortCodes[0]}`,
+          createdAt: expect.any(String),
+        },
+      ],
+      nextCursor: null,
+    });
+
+    await prisma.shortUrl.deleteMany({
+      where: { shortCode: { in: [...shortCodes, otherShortCode] } },
+    });
+  });
+
+  it.each(['?limit=0', '?limit=101', '?cursor=abc'])(
+    'GET /api/short-urls rejects %s',
+    async (query) => {
+      const response = await listShortUrls(query, `Bearer ${accessToken}`);
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ errorCode: 'VALIDATION_FAILED' });
+    },
+  );
+
+  it('GET /api/short-urls rejects a missing token', async () => {
+    const response = await listShortUrls('');
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ errorCode: 'UNAUTHORIZED' });
+  });
+
   it('cannot read the auth schema', async () => {
     await expect(
       app.get(ShortUrlsDbService).$queryRaw`SELECT 1 FROM auth.users`,
