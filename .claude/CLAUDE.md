@@ -61,9 +61,14 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
   - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
   - After editing, run `docker compose restart kong`.
-  - Plugins are a global `opentelemetry` and a global `cors`.
+  - Plugins are a global `opentelemetry`, a global `cors`, and a per-route `rate-limiting`.
     - `opentelemetry` sends traces to otel-lgtm and injects W3C `traceparent` upstream.
     - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app.
+    - `rate-limiting` is `limit_by: ip`, `policy: redis` on the compose `redis` service, db 1 (the cache uses db 0), and keeps the default `fault_tolerant: true`, so it fails open when Redis is down. Use the nested `redis:` block, not the deprecated `redis_host` fields. Kong still logs deprecation warnings for those fields at boot; ignore them.
+      - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; login 10/min and 100/h; signup 3/min and 20/h. Health routes are unlimited.
+      - Preflights are not counted, because `cors` answers them before `rate-limiting` runs.
+      - A 429 body is Kong's `{ message, request_id }`, with no `errorCode`. The frontend must handle 429 by status.
+      - In prod, Kong needs `KONG_TRUSTED_IPS` and `KONG_REAL_IP_HEADER`, or every client shares the load balancer's IP.
 - Services talk HTTP/REST to Kong and never call each other.
 - Each app listens on `0.0.0.0` so Kong can reach it from Docker.
 - Builds: each app is bundled by Rspack (`"builder": "rspack"` in `nest-cli.json`) into `dist/apps/<app>/main.js`.
@@ -135,7 +140,7 @@ Health checks through Kong:
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
-  - Kong plugins other than `opentelemetry` and `cors`.
+  - Kong plugins other than `opentelemetry`, `cors` and `rate-limiting`.
   - App Dockerfiles and CI.
 - `ShortUrl.userId` is a nullable indexed `BigInt` with no FK to `User`, by decision: `User` belongs to auth-service. Rows created before auth have `userId` null.
 - Planned data model additions to `ShortUrl`:

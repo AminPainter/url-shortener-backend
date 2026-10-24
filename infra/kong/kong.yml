@@ -29,10 +29,32 @@ services:
         methods: [POST, OPTIONS]
         paths: ['~/api/auth/signup$']
         strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 3
+              hour: 20
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
       - name: login
         methods: [POST, OPTIONS]
         paths: ['~/api/auth/login$']
         strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              hour: 100
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
 
   - name: short-url-write-service
     url: http://host.docker.internal:9112
@@ -45,6 +67,17 @@ services:
         methods: [POST, OPTIONS]
         paths: ['~/api/short-urls$']
         strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              hour: 200
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
 
   - name: short-url-read-service
     url: http://host.docker.internal:9111
@@ -57,3 +90,14 @@ services:
         methods: [GET]
         paths: ['~/[0-9A-Za-z]{7}$']
         strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              second: 50
+              minute: 1000
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
