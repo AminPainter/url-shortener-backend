@@ -10,6 +10,12 @@ plugins:
         default_format: w3c
         extract: [w3c]
         inject: [w3c]
+  - name: cors
+    config:
+      origins: ['http://localhost:6175']
+      methods: [GET, POST, OPTIONS]
+      headers: [Authorization, Content-Type]
+      credentials: false
 
 services:
   - name: auth-service
@@ -20,11 +26,11 @@ services:
         paths: ['~/api/auth/health$']
         strip_path: false
       - name: signup
-        methods: [POST]
+        methods: [POST, OPTIONS]
         paths: ['~/api/auth/signup$']
         strip_path: false
       - name: login
-        methods: [POST]
+        methods: [POST, OPTIONS]
         paths: ['~/api/auth/login$']
         strip_path: false
 
@@ -36,7 +42,7 @@ services:
         paths: ['~/api/health$']
         strip_path: false
       - name: create-short-url
-        methods: [POST]
+        methods: [POST, OPTIONS]
         paths: ['~/api/short-urls$']
         strip_path: false
 

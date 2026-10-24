@@ -61,7 +61,9 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
   - Every endpoint gets its own explicit route: method plus an anchored regex path (`~/api/short-urls$`). No prefix or catch-all routes. Unrouted paths 404 at Kong.
   - Kong reaches the host apps through `host.docker.internal`.
   - After editing, run `docker compose restart kong`.
-  - The only plugin is a global `opentelemetry`. It sends traces to otel-lgtm and injects W3C `traceparent` upstream.
+  - Plugins are a global `opentelemetry` and a global `cors`.
+    - `opentelemetry` sends traces to otel-lgtm and injects W3C `traceparent` upstream.
+    - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app.
 - Services talk HTTP/REST to Kong and never call each other.
 - Each app listens on `0.0.0.0` so Kong can reach it from Docker.
 - Builds: each app is bundled by Rspack (`"builder": "rspack"` in `nest-cli.json`) into `dist/apps/<app>/main.js`.
@@ -104,6 +106,9 @@ Health checks through Kong:
 ## Observability
 - OpenTelemetry starts from `instrumentation.mjs` at the repo root, a plain ESM preload outside Rspack.
   - Rspack emits node_modules as hoisted static ESM imports, so the SDK cannot start inside the bundle.
+## Git
+- Always commit and push straight to `main`. No feature branches or PRs.
+
   - `nest-cli.json` sets a per-project `exec`: `OTEL_SERVICE_NAME=<app> node --env-file=.env --import ./instrumentation.mjs`.
   - Do not use `NODE_OPTIONS`, which would also load the SDK into the Nest CLI and Rspack.
   - Edits to the preload need an app restart; watch mode does not reload it.
@@ -127,7 +132,7 @@ Health checks through Kong:
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
-  - Kong plugins other than `opentelemetry`.
+  - Kong plugins other than `opentelemetry` and `cors`.
   - App Dockerfiles and CI.
 - `ShortUrl.userId` is a nullable indexed `BigInt` with no FK to `User`, by decision: `User` belongs to auth-service. Rows created before auth have `userId` null.
 - Planned data model additions to `ShortUrl`:
