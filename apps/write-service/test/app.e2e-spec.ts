@@ -54,19 +54,19 @@ describe('WriteService (e2e)', () => {
 
   it('POST /api/short-urls stores the link for the token user', async () => {
     const response = await createShortUrl(
-      { longUrl: 'https://glomo.one' },
+      { longUrl: 'https://example.com' },
       `Bearer ${accessToken}`,
     );
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({
       shortCode: expect.stringMatching(/^[0-9A-Za-z]{7}$/),
-      longUrl: 'https://glomo.one',
+      longUrl: 'https://example.com',
     });
 
     const prisma = app.get(PrismaService);
     const { shortCode } = response.json();
     const shortUrl = await prisma.shortUrl.findUnique({ where: { shortCode } });
-    expect(shortUrl?.longUrl).toBe('https://glomo.one');
+    expect(shortUrl?.longUrl).toBe('https://example.com');
     expect(shortUrl?.userId).toBe(BigInt(userId));
     await prisma.shortUrl.delete({ where: { shortCode } });
   });
@@ -84,7 +84,7 @@ describe('WriteService (e2e)', () => {
   );
 
   it('POST /api/short-urls rejects a missing token', async () => {
-    const response = await createShortUrl({ longUrl: 'https://glomo.one' });
+    const response = await createShortUrl({ longUrl: 'https://example.com' });
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({
       statusCode: 401,
@@ -95,7 +95,7 @@ describe('WriteService (e2e)', () => {
 
   it('POST /api/short-urls rejects a malformed token', async () => {
     const response = await createShortUrl(
-      { longUrl: 'https://glomo.one' },
+      { longUrl: 'https://example.com' },
       'Bearer not-a-jwt',
     );
     expect(response.statusCode).toBe(401);
@@ -111,7 +111,7 @@ describe('WriteService (e2e)', () => {
       secret: 'forged-secret',
     }).signAsync({ sub: userId }, { issuer: 'auth-service' });
     const response = await createShortUrl(
-      { longUrl: 'https://glomo.one' },
+      { longUrl: 'https://example.com' },
       `Bearer ${forgedToken}`,
     );
     expect(response.statusCode).toBe(401);

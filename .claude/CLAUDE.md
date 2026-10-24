@@ -1,6 +1,6 @@
-# glomo-url-shortner-backend
+# CutItShort backend
 
-High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind Kong. The frontend lives in a separate repo (`../glomo-url-shortner-frontend`) and only ever talks to Kong.
+High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind Kong. The frontend lives in a separate repo (`../frontend`) and only ever talks to Kong.
 
 ## Coding rules (mandatory)
 - Write ZERO comments in code. No inline, block, JSDoc or TODO comments.

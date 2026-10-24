@@ -34,12 +34,12 @@ describe('ReadService (e2e)', () => {
     const prisma = app.get(PrismaService);
     const shortCode = randomBytes(4).toString('hex').slice(0, 7);
     await prisma.shortUrl.create({
-      data: { shortCode, longUrl: 'https://glomo.one' },
+      data: { shortCode, longUrl: 'https://example.com' },
     });
 
     const res = await app.inject({ method: 'GET', url: `/${shortCode}` });
     expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe('https://glomo.one');
+    expect(res.headers.location).toBe('https://example.com');
 
     await prisma.shortUrl.delete({ where: { shortCode } });
     await app.get<Cache>(CACHE_MANAGER).del(shortCode);
@@ -49,14 +49,14 @@ describe('ReadService (e2e)', () => {
     const prisma = app.get(PrismaService);
     const shortCode = randomBytes(4).toString('hex').slice(0, 7);
     await prisma.shortUrl.create({
-      data: { shortCode, longUrl: 'https://glomo.one' },
+      data: { shortCode, longUrl: 'https://example.com' },
     });
     await app.inject({ method: 'GET', url: `/${shortCode}` });
     await prisma.shortUrl.delete({ where: { shortCode } });
 
     const res = await app.inject({ method: 'GET', url: `/${shortCode}` });
     expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe('https://glomo.one');
+    expect(res.headers.location).toBe('https://example.com');
 
     await app.get<Cache>(CACHE_MANAGER).del(shortCode);
   });
@@ -66,7 +66,7 @@ describe('ReadService (e2e)', () => {
     const shortCode = randomBytes(4).toString('hex').slice(0, 7);
     await app.inject({ method: 'GET', url: `/${shortCode}` });
     await prisma.shortUrl.create({
-      data: { shortCode, longUrl: 'https://glomo.one' },
+      data: { shortCode, longUrl: 'https://example.com' },
     });
 
     const res = await app.inject({ method: 'GET', url: `/${shortCode}` });

@@ -24,7 +24,7 @@ describe('AuthService (e2e)', () => {
     app.setGlobalPrefix('api/auth');
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
-    email = `e2e-${randomBytes(6).toString('hex')}@glomo.one`;
+    email = `e2e-${randomBytes(6).toString('hex')}@example.com`;
   });
 
   const signup = (payload: object) =>
@@ -65,7 +65,7 @@ describe('AuthService (e2e)', () => {
   it.each([
     {},
     { email: 'not-an-email', password: 'correct-horse' },
-    { email: 'valid@glomo.one', password: 'short' },
+    { email: 'valid@example.com', password: 'short' },
   ])('POST /api/auth/signup rejects %j', async (payload) => {
     const response = await signup(payload);
     expect(response.statusCode).toBe(400);

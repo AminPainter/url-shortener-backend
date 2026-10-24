@@ -1,4 +1,4 @@
-# glomo-url-shortner-backend
+# CutItShort backend
 
 NestJS monorepo: `apps/read-service` (redirects) and `apps/write-service` (`/api/*`), behind Kong.
 The Nest apps run on the host; Postgres, Redis and Kong run in Docker.
