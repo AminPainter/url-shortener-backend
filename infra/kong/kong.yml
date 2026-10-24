@@ -15,6 +15,7 @@ plugins:
       origins: ['http://localhost:6175']
       methods: [GET, POST, OPTIONS]
       headers: [Authorization, Content-Type]
+      exposed_headers: [Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
       credentials: false
 
 services:

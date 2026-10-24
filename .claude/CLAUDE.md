@@ -63,7 +63,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
   - After editing, run `docker compose restart kong`.
   - Plugins are a global `opentelemetry`, a global `cors`, and a per-route `rate-limiting`.
     - `opentelemetry` sends traces to otel-lgtm and injects W3C `traceparent` upstream.
-    - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app.
+    - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app. It exposes `Retry-After` and `RateLimit-Limit/Remaining/Reset` so the frontend can read them.
     - `rate-limiting` is `limit_by: ip`, `policy: redis` on the compose `redis` service, db 1 (the cache uses db 0), and keeps the default `fault_tolerant: true`, so it fails open when Redis is down. Use the nested `redis:` block, not the deprecated `redis_host` fields. Kong still logs deprecation warnings for those fields at boot; ignore them.
       - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; login 10/min and 100/h; signup 3/min and 20/h. Health routes are unlimited.
       - Preflights are not counted, because `cors` answers them before `rate-limiting` runs.
