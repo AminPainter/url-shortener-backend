@@ -129,6 +129,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.2
         version: 4.1.12(vitest@4.1.12)
+      mprocs:
+        specifier: 0.9.6
+        version: 0.9.6
       oxlint:
         specifier: ^1.58.0
         version: 1.89.0(oxlint-tsgolint@7.0.2004)
@@ -2405,6 +2408,11 @@ packages:
 
   module-details-from-path@1.0.4:
     resolution: {integrity: sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==}
+
+  mprocs@0.9.6:
+    resolution: {integrity: sha512-sEwB5XD3/rReB47h0YbN2L5fXOLcMjF8sOEDTMr/daCLyVZfU4CegbanxO0ybiaFx0MQ/nV7yzOHmprmy2Wq9w==}
+    engines: {node: '>=0.10.0'}
+    hasBin: true
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -5462,6 +5470,8 @@ snapshots:
   minimist@1.2.8: {}
 
   module-details-from-path@1.0.4: {}
+
+  mprocs@0.9.6: {}
 
   ms@2.1.3: {}
 

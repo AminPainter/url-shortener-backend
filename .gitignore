@@ -3,3 +3,4 @@ dist
 coverage
 .env
 libs/prisma/src/generated
+mprocs.log

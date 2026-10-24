@@ -1,0 +1,7 @@
+procs:
+  short-url-read:
+    shell: pnpm start:short-url-read
+  short-url-write:
+    shell: pnpm start:short-url-write
+  auth:
+    shell: pnpm start:auth

@@ -91,6 +91,7 @@ New host ports continue sequentially from 9120.
 ## Commands
 ```
 pnpm infra:up / pnpm infra:down
+pnpm dev         # all apps in mprocs (TUI, mprocs.yaml)
 pnpm start:short-url-read / pnpm start:short-url-write / pnpm start:auth
 pnpm build short-url-read-service | short-url-write-service | auth-service
 pnpm test        # unit, *.spec.ts
@@ -98,17 +99,19 @@ pnpm test:e2e    # *.e2e-spec.ts, using Fastify app.inject
 pnpm lint        # oxlint --type-aware
 ```
 
+`pnpm dev` needs an interactive terminal. Claude starts apps with the individual `pnpm start:*` scripts in the background instead.
+
 Health checks through Kong:
 - `curl localhost:9113/health` (short-url-read-service)
 - `curl localhost:9113/api/health` (short-url-write-service)
 - `curl localhost:9113/api/auth/health` (auth-service)
 
-## Observability
-- OpenTelemetry starts from `instrumentation.mjs` at the repo root, a plain ESM preload outside Rspack.
-  - Rspack emits node_modules as hoisted static ESM imports, so the SDK cannot start inside the bundle.
 ## Git
 - Always commit and push straight to `main`. No feature branches or PRs.
 
+## Observability
+- OpenTelemetry starts from `instrumentation.mjs` at the repo root, a plain ESM preload outside Rspack.
+  - Rspack emits node_modules as hoisted static ESM imports, so the SDK cannot start inside the bundle.
   - `nest-cli.json` sets a per-project `exec`: `OTEL_SERVICE_NAME=<app> node --env-file=.env --import ./instrumentation.mjs`.
   - Do not use `NODE_OPTIONS`, which would also load the SDK into the Nest CLI and Rspack.
   - Edits to the preload need an app restart; watch mode does not reload it.
