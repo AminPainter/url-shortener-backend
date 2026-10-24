@@ -12,4 +12,14 @@ model ShortUrl {
   shortCode String   @unique
   longUrl   String
   createdAt DateTime @default(now())
+  userId    BigInt?
+
+  @@index([userId])
+}
+
+model User {
+  id           BigInt   @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
 }

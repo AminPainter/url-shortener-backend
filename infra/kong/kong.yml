@@ -12,6 +12,22 @@ plugins:
         inject: [w3c]
 
 services:
+  - name: auth-service
+    url: http://host.docker.internal:9119
+    routes:
+      - name: auth-health
+        methods: [GET]
+        paths: ['~/api/auth/health$']
+        strip_path: false
+      - name: signup
+        methods: [POST]
+        paths: ['~/api/auth/signup$']
+        strip_path: false
+      - name: login
+        methods: [POST]
+        paths: ['~/api/auth/login$']
+        strip_path: false
+
   - name: write-service
     url: http://host.docker.internal:9112
     routes:

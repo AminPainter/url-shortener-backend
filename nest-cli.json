@@ -10,6 +10,16 @@
   "monorepo": true,
   "root": "apps/read-service",
   "projects": {
+    "auth-service": {
+      "type": "application",
+      "root": "apps/auth-service",
+      "entryFile": "main",
+      "exec": "OTEL_SERVICE_NAME=auth-service node --env-file=.env --import ./instrumentation.mjs",
+      "sourceRoot": "apps/auth-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/auth-service/tsconfig.app.json"
+      }
+    },
     "cache": {
       "type": "library",
       "root": "libs/cache",

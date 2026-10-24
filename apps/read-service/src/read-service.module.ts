@@ -6,6 +6,7 @@ import { PrismaModule } from '@app/prisma';
 import { HealthController } from './health.controller';
 import { RedirectController } from './redirect.controller';
 import { RedirectService } from './redirect.service';
+import { ShortUrlsRepository } from './short-urls.repository';
 
 @Module({
   imports: [
@@ -15,6 +16,6 @@ import { RedirectService } from './redirect.service';
     RedisCacheModule,
   ],
   controllers: [HealthController, RedirectController],
-  providers: [RedirectService],
+  providers: [RedirectService, ShortUrlsRepository],
 })
 export class ReadServiceModule {}

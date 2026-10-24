@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { PrismaService } from '@app/prisma';
+import { ShortUrlsRepository } from './short-urls.repository';
 
 const LONG_URL_CACHE_TTL_MS = 86_400_000;
 
 @Injectable()
 export class RedirectService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly shortUrlsRepository: ShortUrlsRepository,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
@@ -16,13 +16,10 @@ export class RedirectService {
     const cachedLongUrl = await this.cache.get<string>(shortCode);
     if (cachedLongUrl) return cachedLongUrl;
 
-    const shortUrl = await this.prisma.shortUrl.findUnique({
-      where: { shortCode },
-      select: { longUrl: true },
-    });
-    if (!shortUrl) return null;
+    const longUrl = await this.shortUrlsRepository.findLongUrl(shortCode);
+    if (!longUrl) return null;
 
-    await this.cache.set(shortCode, shortUrl.longUrl, LONG_URL_CACHE_TTL_MS);
-    return shortUrl.longUrl;
+    await this.cache.set(shortCode, longUrl, LONG_URL_CACHE_TTL_MS);
+    return longUrl;
   }
 }
