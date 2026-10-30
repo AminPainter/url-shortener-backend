@@ -198,6 +198,113 @@ describe('ShortUrlWriteService (e2e)', () => {
     expect(response.json()).toMatchObject({ errorCode: 'UNAUTHORIZED' });
   });
 
+  const getSubscription = (authorization?: string) =>
+    app.inject({
+      method: 'GET',
+      url: '/api/subscription',
+      headers: authorization ? { authorization } : {},
+    });
+
+  const seedShortUrls = async (count: number) => {
+    const shortCodes = Array.from({ length: count }, () =>
+      randomInt(36 ** 6, 36 ** 7).toString(36),
+    );
+    await app.get(ShortUrlsDbService).shortUrl.createMany({
+      data: shortCodes.map((shortCode) => ({
+        shortCode,
+        longUrl: 'https://example.com',
+        userId: BigInt(userId),
+      })),
+    });
+  };
+
+  const cleanUpUser = async () => {
+    const prisma = app.get(ShortUrlsDbService);
+    await prisma.shortUrl.deleteMany({ where: { userId: BigInt(userId) } });
+    await prisma.subscriptionPlan.deleteMany({
+      where: { userId: BigInt(userId) },
+    });
+  };
+
+  it('GET /api/plans lists the plans', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/plans' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        { plan: 'FREE', name: 'Free', linkLimit: 10 },
+        { plan: 'PRO', name: 'Pro', linkLimit: 100 },
+        { plan: 'BUSINESS', name: 'Business', linkLimit: 1000 },
+      ],
+    });
+  });
+
+  it('GET /api/subscription defaults a new user to Free', async () => {
+    const response = await getSubscription(`Bearer ${accessToken}`);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      plan: 'FREE',
+      name: 'Free',
+      linkLimit: 10,
+      linkCount: 0,
+    });
+  });
+
+  it('GET /api/subscription rejects a missing token', async () => {
+    const response = await getSubscription();
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ errorCode: 'UNAUTHORIZED' });
+  });
+
+  it('POST /api/short-urls rejects a link past the plan limit', async () => {
+    await seedShortUrls(10);
+    const response = await createShortUrl(
+      { longUrl: 'https://example.com' },
+      `Bearer ${accessToken}`,
+    );
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      statusCode: 403,
+      message: 'Forbidden',
+      errorCode: 'LINK_LIMIT_REACHED',
+    });
+    await cleanUpUser();
+  });
+
+  it('POST /api/short-urls follows the stored plan', async () => {
+    await seedShortUrls(10);
+    await app.get(ShortUrlsDbService).subscriptionPlan.create({
+      data: { userId: BigInt(userId), plan: 'PRO' },
+    });
+    const response = await createShortUrl(
+      { longUrl: 'https://example.com' },
+      `Bearer ${accessToken}`,
+    );
+    expect(response.statusCode).toBe(201);
+    expect((await getSubscription(`Bearer ${accessToken}`)).json()).toEqual({
+      plan: 'PRO',
+      name: 'Pro',
+      linkLimit: 100,
+      linkCount: 11,
+    });
+    await cleanUpUser();
+  });
+
+  it('POST /api/short-urls admits only one concurrent create at the limit', async () => {
+    await seedShortUrls(9);
+    const responses = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        createShortUrl(
+          { longUrl: 'https://example.com' },
+          `Bearer ${accessToken}`,
+        ),
+      ),
+    );
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([
+      201, 403, 403,
+    ]);
+    await cleanUpUser();
+  });
+
   it('cannot read the auth schema', async () => {
     await expect(
       app.get(ShortUrlsDbService).$queryRaw`SELECT 1 FROM auth.users`,

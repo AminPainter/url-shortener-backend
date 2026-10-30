@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service';
 import { ShortUrlsRepository } from '../repositories/short-urls.repository';
 
 const ALPHABET =
@@ -7,14 +8,23 @@ const ALPHABET =
 
 @Injectable()
 export class ShortUrlsService {
-  constructor(private readonly shortUrlsRepository: ShortUrlsRepository) {}
+  constructor(
+    private readonly shortUrlsRepository: ShortUrlsRepository,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
-  create(longUrl: string, userId: bigint) {
+  async create(longUrl: string, userId: bigint) {
+    const { linkLimit } = await this.subscriptionsService.getPlan(userId);
     const shortCode = Array.from(
       { length: 7 },
       () => ALPHABET[randomInt(62)],
     ).join('');
-    return this.shortUrlsRepository.create(shortCode, longUrl, userId);
+    return this.shortUrlsRepository.createWithinLimit(
+      shortCode,
+      longUrl,
+      userId,
+      linkLimit,
+    );
   }
 
   async list(userId: bigint, limit: number, cursor?: bigint) {

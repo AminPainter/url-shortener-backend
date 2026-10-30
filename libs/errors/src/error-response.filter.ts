@@ -3,6 +3,7 @@ import {
   Catch,
   ConflictException,
   ExceptionFilter,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   InternalServerErrorException,
@@ -10,7 +11,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { ConflictError, NotFoundError } from './domain-error';
+import { ConflictError, ForbiddenError, NotFoundError } from './domain-error';
 
 @Catch()
 export class ErrorResponseFilter implements ExceptionFilter {
@@ -47,6 +48,12 @@ export class ErrorResponseFilter implements ExceptionFilter {
     }
     if (exception instanceof ConflictError) {
       return new ConflictException(undefined, {
+        cause: exception,
+        errorCode: exception.code,
+      });
+    }
+    if (exception instanceof ForbiddenError) {
+      return new ForbiddenException(undefined, {
         cause: exception,
         errorCode: exception.code,
       });

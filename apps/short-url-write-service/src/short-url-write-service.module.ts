@@ -7,6 +7,7 @@ import { ZodValidationPipe } from '@app/validation';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { ShortUrlsModule } from './short-urls/short-urls.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ShortUrlsModule } from './short-urls/short-urls.module';
     HealthModule,
     AuthModule,
     ShortUrlsModule,
+    SubscriptionsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ErrorResponseFilter },

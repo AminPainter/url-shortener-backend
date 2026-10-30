@@ -19,3 +19,21 @@ model ShortUrl {
   @@map("short_urls")
   @@schema("shorturls")
 }
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+
+  @@schema("shorturls")
+}
+
+model SubscriptionPlan {
+  userId    BigInt   @id @map("user_id")
+  plan      Plan
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("subscription_plans")
+  @@schema("shorturls")
+}

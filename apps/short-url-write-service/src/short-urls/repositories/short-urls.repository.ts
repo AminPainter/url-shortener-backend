@@ -1,14 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { ShortUrlsDbService } from '@app/short-urls-db';
+import { LinkLimitReachedError } from '../errors/link-limit-reached.error';
 
 @Injectable()
 export class ShortUrlsRepository {
   constructor(private readonly prisma: ShortUrlsDbService) {}
 
-  create(shortCode: string, longUrl: string, userId: bigint) {
-    return this.prisma.shortUrl.create({
-      data: { shortCode, longUrl, userId },
-      select: { shortCode: true, longUrl: true },
+  createWithinLimit(
+    shortCode: string,
+    longUrl: string,
+    userId: bigint,
+    linkLimit: number,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const linkCount = await transaction.shortUrl.count({ where: { userId } });
+      if (linkCount >= linkLimit) throw new LinkLimitReachedError();
+      return transaction.shortUrl.create({
+        data: { shortCode, longUrl, userId },
+        select: { shortCode: true, longUrl: true },
+      });
     });
   }
 
