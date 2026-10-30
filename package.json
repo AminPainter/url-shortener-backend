@@ -29,6 +29,10 @@
   "dependencies": {
     "@fastify/otel": "0.21.3",
     "@keyv/redis": "5.1.6",
+    "@nestjs-cls/transactional": "4.0.2",
+    "@nestjs-cls/transactional-adapter-prisma": "2.0.2",
+    "@nestjs-redis/client": "2.0.1",
+    "@nestjs-redis/lock": "2.0.1",
     "@nestjs/cache-manager": "12.0.1",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
@@ -48,12 +52,14 @@
     "bcrypt": "6.0.0",
     "cache-manager": "7.2.9",
     "keyv": "^5.6.0",
+    "nestjs-cls": "7.0.2",
     "nestjs-pino": "^5.3.1",
     "passport": "0.7.0",
     "passport-jwt": "4.0.1",
     "passport-local": "1.0.0",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
+    "redis": "5.12.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.6.7"
@@ -87,6 +93,9 @@
       "@prisma/engines",
       "bcrypt",
       "prisma"
-    ]
+    ],
+    "patchedDependencies": {
+      "@redis-kit/lock@0.1.0-3": "patches/@redis-kit__lock@0.1.0-3.patch"
+    }
   }
 }

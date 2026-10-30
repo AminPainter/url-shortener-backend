@@ -38,6 +38,15 @@
         "tsConfigPath": "libs/errors/tsconfig.lib.json"
       }
     },
+    "lock": {
+      "type": "library",
+      "root": "libs/lock",
+      "entryFile": "index",
+      "sourceRoot": "libs/lock/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/lock/tsconfig.lib.json"
+      }
+    },
     "logger": {
       "type": "library",
       "root": "libs/logger",

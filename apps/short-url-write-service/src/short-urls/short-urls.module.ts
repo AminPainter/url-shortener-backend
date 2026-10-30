@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ShortUrlsDbModule } from '@app/short-urls-db';
+import { RedisLockModule } from '@app/lock';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { ShortUrlsController } from './controllers/short-urls.controller';
 import { ShortUrlsRepository } from './repositories/short-urls.repository';
 import { ShortUrlsService } from './services/short-urls.service';
+import { UserLinkLock } from './utils/user-link-lock.util';
 
 @Module({
-  imports: [
-    ShortUrlsDbModule.forRoot({ urlKey: 'SHORT_URLS_WRITE_DATABASE_URL' }),
-    SubscriptionsModule,
-  ],
+  imports: [RedisLockModule, SubscriptionsModule],
   controllers: [ShortUrlsController],
-  providers: [ShortUrlsService, ShortUrlsRepository],
+  providers: [ShortUrlsService, ShortUrlsRepository, UserLinkLock],
 })
 export class ShortUrlsModule {}

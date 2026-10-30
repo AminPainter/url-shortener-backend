@@ -267,6 +267,9 @@ describe('ShortUrlWriteService (e2e)', () => {
       message: 'Forbidden',
       errorCode: 'LINK_LIMIT_REACHED',
     });
+    expect(
+      (await getSubscription(`Bearer ${accessToken}`)).json(),
+    ).toMatchObject({ linkCount: 10 });
     await cleanUpUser();
   });
 
