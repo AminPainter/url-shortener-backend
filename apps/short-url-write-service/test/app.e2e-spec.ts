@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import {
   FastifyAdapter,
@@ -26,7 +26,7 @@ describe('ShortUrlWriteService (e2e)', () => {
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
-    userId = String(randomInt(1, 2 ** 47));
+    userId = randomUUID();
     accessToken = await new JwtService({
       privateKey: Buffer.from(
         app.get(ConfigService).getOrThrow<string>('JWT_PRIVATE_KEY'),
@@ -67,7 +67,7 @@ describe('ShortUrlWriteService (e2e)', () => {
     const { shortCode } = response.json();
     const shortUrl = await prisma.shortUrl.findUnique({ where: { shortCode } });
     expect(shortUrl?.longUrl).toBe('https://example.com');
-    expect(shortUrl?.userId).toBe(BigInt(userId));
+    expect(shortUrl?.userId).toBe(userId);
     await prisma.shortUrl.delete({ where: { shortCode } });
   });
 
@@ -122,6 +122,23 @@ describe('ShortUrlWriteService (e2e)', () => {
     });
   });
 
+  it('POST /api/short-urls rejects a token whose sub is not a UUID', async () => {
+    const legacyToken = await new JwtService({
+      privateKey: Buffer.from(
+        app.get(ConfigService).getOrThrow<string>('JWT_PRIVATE_KEY'),
+        'base64',
+      ).toString(),
+    }).signAsync(
+      { sub: '42' },
+      { algorithm: 'RS256', expiresIn: '1h', issuer: 'auth-service' },
+    );
+    const response = await createShortUrl(
+      { longUrl: 'https://example.com' },
+      `Bearer ${legacyToken}`,
+    );
+    expect(response.statusCode).toBe(401);
+  });
+
   const listShortUrls = (query: string, authorization?: string) =>
     app.inject({
       method: 'GET',
@@ -139,7 +156,7 @@ describe('ShortUrlWriteService (e2e)', () => {
         data: {
           shortCode,
           longUrl: `https://example.com/${shortCode}`,
-          userId: BigInt(userId),
+          userId: userId,
         },
       });
     }
@@ -148,7 +165,7 @@ describe('ShortUrlWriteService (e2e)', () => {
       data: {
         shortCode: otherShortCode,
         longUrl: 'https://example.com',
-        userId: BigInt(userId) + 1n,
+        userId: randomUUID(),
       },
     });
 
@@ -213,16 +230,16 @@ describe('ShortUrlWriteService (e2e)', () => {
       data: shortCodes.map((shortCode) => ({
         shortCode,
         longUrl: 'https://example.com',
-        userId: BigInt(userId),
+        userId: userId,
       })),
     });
   };
 
   const cleanUpUser = async () => {
     const prisma = app.get(ShortUrlsDbService);
-    await prisma.shortUrl.deleteMany({ where: { userId: BigInt(userId) } });
+    await prisma.shortUrl.deleteMany({ where: { userId: userId } });
     await prisma.subscriptionPlan.deleteMany({
-      where: { userId: BigInt(userId) },
+      where: { userId: userId },
     });
   };
 
@@ -231,9 +248,19 @@ describe('ShortUrlWriteService (e2e)', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       items: [
-        { plan: 'FREE', name: 'Free', linkLimit: 10 },
-        { plan: 'PRO', name: 'Pro', linkLimit: 100 },
-        { plan: 'BUSINESS', name: 'Business', linkLimit: 1000 },
+        { plan: 'FREE', name: 'Free', linkLimit: 10, prices: null },
+        {
+          plan: 'PRO',
+          name: 'Pro',
+          linkLimit: 100,
+          prices: { currency: 'USD', MONTH: 500, YEAR: 5000 },
+        },
+        {
+          plan: 'BUSINESS',
+          name: 'Business',
+          linkLimit: 1000,
+          prices: { currency: 'USD', MONTH: 2000, YEAR: 20000 },
+        },
       ],
     });
   });
@@ -245,7 +272,9 @@ describe('ShortUrlWriteService (e2e)', () => {
       plan: 'FREE',
       name: 'Free',
       linkLimit: 10,
+      prices: null,
       linkCount: 0,
+      billing: null,
     });
   });
 
@@ -276,7 +305,7 @@ describe('ShortUrlWriteService (e2e)', () => {
   it('POST /api/short-urls follows the stored plan', async () => {
     await seedShortUrls(10);
     await app.get(ShortUrlsDbService).subscriptionPlan.create({
-      data: { userId: BigInt(userId), plan: 'PRO' },
+      data: { userId: userId, plan: 'PRO' },
     });
     const response = await createShortUrl(
       { longUrl: 'https://example.com' },
@@ -287,7 +316,9 @@ describe('ShortUrlWriteService (e2e)', () => {
       plan: 'PRO',
       name: 'Pro',
       linkLimit: 100,
+      prices: { currency: 'USD', MONTH: 500, YEAR: 5000 },
       linkCount: 11,
+      billing: null,
     });
     await cleanUpUser();
   });

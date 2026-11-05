@@ -38,6 +38,15 @@
         "tsConfigPath": "libs/errors/tsconfig.lib.json"
       }
     },
+    "jwt-auth": {
+      "type": "library",
+      "root": "libs/jwt-auth",
+      "entryFile": "index",
+      "sourceRoot": "libs/jwt-auth/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/jwt-auth/tsconfig.lib.json"
+      }
+    },
     "lock": {
       "type": "library",
       "root": "libs/lock",

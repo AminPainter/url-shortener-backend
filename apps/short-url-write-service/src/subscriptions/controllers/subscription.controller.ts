@@ -1,14 +1,14 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, UserId } from '@app/jwt-auth';
 import { SubscriptionsService } from '../services/subscriptions.service';
 
 @Controller('subscription')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 export class SubscriptionController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
   @Get()
-  get(@Req() request: { user: { userId: bigint } }) {
-    return this.subscriptionsService.getSubscription(request.user.userId);
+  get(@UserId() userId: string) {
+    return this.subscriptionsService.getSubscription(userId);
   }
 }

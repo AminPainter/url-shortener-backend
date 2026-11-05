@@ -8,7 +8,7 @@ const LOCK_EXTENSION_THRESHOLD_MS = 1_000;
 export class UserLinkLock {
   constructor(private readonly redlockService: RedlockService) {}
 
-  withLock<T>(userId: bigint, criticalSection: () => Promise<T>) {
+  withLock<T>(userId: string, criticalSection: () => Promise<T>) {
     return this.redlockService.withLock(
       `lock:short-urls:user:${userId}`,
       LOCK_TTL_MS,

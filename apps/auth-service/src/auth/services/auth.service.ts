@@ -8,7 +8,7 @@ const UNKNOWN_USER_PASSWORD_HASH =
   '$2b$12$w2R6AVNjtwVsoZrPTuBGLOZtbAsWAj29jJjDhiB.qX8.WOpgP1Bnu';
 
 export interface AuthenticatedUser {
-  id: bigint;
+  id: string;
   email: string;
 }
 
@@ -40,6 +40,6 @@ export class AuthService {
   }
 
   issueAccessToken(user: AuthenticatedUser) {
-    return this.jwtService.signAsync({ sub: user.id.toString() });
+    return this.jwtService.signAsync({ sub: user.id });
   }
 }

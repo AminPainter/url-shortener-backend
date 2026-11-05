@@ -13,7 +13,7 @@ model ShortUrl {
   shortCode String   @unique @map("short_code")
   longUrl   String   @map("long_url")
   createdAt DateTime @default(now()) @map("created_at")
-  userId    BigInt?  @map("user_id")
+  userId    String?  @map("user_id") @db.Uuid
 
   @@index([userId, id])
   @@map("short_urls")
@@ -29,11 +29,134 @@ enum Plan {
 }
 
 model SubscriptionPlan {
-  userId    BigInt   @id @map("user_id")
-  plan      Plan
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  userId                String               @id @map("user_id") @db.Uuid
+  plan                  Plan
+  billingSubscriptionId BigInt?              @unique @map("billing_subscription_id")
+  billingSubscription   BillingSubscription? @relation(fields: [billingSubscriptionId], references: [id])
+  validUntil            DateTime?            @map("valid_until")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
 
   @@map("subscription_plans")
+  @@schema("shorturls")
+}
+
+enum PaymentPartner {
+  GLOMO
+
+  @@schema("shorturls")
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+
+  @@schema("shorturls")
+}
+
+enum BillingSubscriptionStatus {
+  CREATED
+  AUTHORIZED
+  ACTIVE
+  PAUSED
+  HALTED
+  ACTION_REQUIRED
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  FAILED
+
+  @@schema("shorturls")
+}
+
+enum BillingPaymentSequence {
+  FIRST
+  SUBSEQUENT
+
+  @@schema("shorturls")
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+
+  @@schema("shorturls")
+}
+
+model BillingCustomer {
+  userId            String         @map("user_id") @db.Uuid
+  partner           PaymentPartner
+  partnerCustomerId String         @map("partner_customer_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  @@id([userId, partner])
+  @@unique([partner, partnerCustomerId])
+  @@map("billing_customers")
+  @@schema("shorturls")
+}
+
+model BillingSubscription {
+  id                    BigInt                    @id @default(autoincrement())
+  userId                String                    @map("user_id") @db.Uuid
+  partner               PaymentPartner
+  partnerSubscriptionId String                    @map("partner_subscription_id")
+  plan                  Plan
+  interval              BillingInterval
+  amount                Int
+  currency              String
+  status                BillingSubscriptionStatus
+  currentPeriodEnd      DateTime?                 @map("current_period_end")
+  cancelledAt           DateTime?                 @map("cancelled_at")
+  haltReason            Json?                     @map("halt_reason")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  payments              BillingPayment[]
+  subscriptionPlan      SubscriptionPlan?
+
+  @@unique([partner, partnerSubscriptionId])
+  @@index([userId])
+  @@map("billing_subscriptions")
+  @@schema("shorturls")
+}
+
+model BillingPayment {
+  id                    BigInt                 @id @default(autoincrement())
+  billingSubscriptionId BigInt                 @map("billing_subscription_id")
+  billingSubscription   BillingSubscription    @relation(fields: [billingSubscriptionId], references: [id])
+  partner               PaymentPartner
+  partnerPaymentId      String                 @map("partner_payment_id")
+  sequence              BillingPaymentSequence
+  amount                Int
+  currency              String
+  status                String
+  complianceStatus      String?                @map("compliance_status")
+  paidAt                DateTime?              @map("paid_at")
+  failureCode           String?                @map("failure_code")
+  failureMessage        String?                @map("failure_message")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  @@unique([partner, partnerPaymentId])
+  @@index([billingSubscriptionId])
+  @@map("billing_payments")
+  @@schema("shorturls")
+}
+
+model WebhookEvent {
+  id          BigInt             @id @default(autoincrement())
+  partner     PaymentPartner
+  dedupeKey   String             @map("dedupe_key")
+  entityType  String             @map("entity_type")
+  eventType   String             @map("event_type")
+  entityId    String?            @map("entity_id")
+  payload     Json
+  status      WebhookEventStatus @default(RECEIVED)
+  receivedAt  DateTime           @default(now()) @map("received_at")
+  processedAt DateTime?          @map("processed_at")
+
+  @@unique([partner, dedupeKey])
+  @@map("webhook_events")
   @@schema("shorturls")
 }

@@ -9,6 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthDbService } from '@app/auth-db';
 import { AuthServiceModule } from './../src/auth-service.module';
 
+const UUID_V7 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 describe('AuthService (e2e)', () => {
   let app: NestFastifyApplication;
   let email: string;
@@ -46,7 +49,7 @@ describe('AuthService (e2e)', () => {
     const response = await signup({ email, password: 'correct-horse' });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({
-      id: expect.stringMatching(/^\d+$/),
+      id: expect.stringMatching(UUID_V7),
       email,
     });
   });
@@ -146,6 +149,61 @@ describe('AuthService (e2e)', () => {
       message: 'Unauthorized',
       errorCode: 'INVALID_CREDENTIALS',
     });
+  });
+
+  const signupAndLogin = async () => {
+    await signup({ email, password: 'correct-horse' });
+    return `Bearer ${(await login({ email, password: 'correct-horse' })).json().accessToken}`;
+  };
+
+  const billingAddress = {
+    addressLine1: '1 Main St',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    country: 'ind',
+    pincode: '560001',
+  };
+
+  it('GET /api/auth/me rejects a missing token', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/auth/me' });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('PATCH /api/auth/me stores the billing profile', async () => {
+    const authorization = await signupAndLogin();
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization },
+      payload: { name: 'Test Payer', address: billingAddress },
+    });
+    expect(updated.statusCode).toBe(200);
+    const profile = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { authorization },
+    });
+    expect(profile.json()).toEqual({
+      id: expect.stringMatching(UUID_V7),
+      email,
+      name: 'Test Payer',
+      address: { ...billingAddress, country: 'IND' },
+    });
+  });
+
+  it.each([
+    { name: '', address: billingAddress },
+    { name: 'Test Payer', address: { ...billingAddress, country: 'IN' } },
+    { name: 'Test Payer', address: { ...billingAddress, city: undefined } },
+  ])('PATCH /api/auth/me rejects %j', async (payload) => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization: await signupAndLogin() },
+      payload,
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errorCode: 'VALIDATION_FAILED' });
   });
 
   it('cannot read the shorturls schema', async () => {

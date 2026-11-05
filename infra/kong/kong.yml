@@ -13,7 +13,7 @@ plugins:
   - name: cors
     config:
       origins: ['http://localhost:6175']
-      methods: [GET, POST, OPTIONS]
+      methods: [GET, POST, PATCH, OPTIONS]
       headers: [Authorization, Content-Type]
       exposed_headers: [Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
       credentials: false
@@ -44,6 +44,36 @@ services:
       - name: login
         methods: [POST, OPTIONS]
         paths: ['~/api/auth/login$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              hour: 100
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+      - name: get-profile
+        methods: [GET, OPTIONS]
+        paths: ['~/api/auth/me$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              hour: 1000
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+      - name: update-profile
+        methods: [PATCH]
+        paths: ['~/api/auth/me$']
         strip_path: false
         plugins:
           - name: rate-limiting
@@ -121,6 +151,70 @@ services:
             config:
               minute: 60
               hour: 1000
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+
+      - name: start-checkout
+        methods: [POST, OPTIONS]
+        paths: ['~/api/billing/checkout$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              hour: 60
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+
+      - name: confirm-checkout
+        methods: [POST, OPTIONS]
+        paths: ['~/api/billing/checkout/confirm$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              hour: 60
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+
+      - name: cancel-subscription
+        methods: [POST, OPTIONS]
+        paths: ['~/api/billing/cancel$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 5
+              hour: 20
+              limit_by: ip
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 1
+
+      - name: glomo-webhooks
+        methods: [POST]
+        paths: ['~/api/webhooks/glomo$']
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 600
+              hour: 10000
               limit_by: ip
               policy: redis
               redis:
