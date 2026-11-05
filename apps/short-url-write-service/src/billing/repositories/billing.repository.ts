@@ -37,6 +37,7 @@ export interface PaymentRecord {
   amount: number;
   currency: string;
   status: string;
+  complianceStatus: string | null;
   paidAt: Date | null;
   failureCode: string | null;
   failureMessage: string | null;

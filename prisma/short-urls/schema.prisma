@@ -131,6 +131,7 @@ model BillingPayment {
   amount                Int
   currency              String
   status                String
+  complianceStatus      String?                @map("compliance_status")
   paidAt                DateTime?              @map("paid_at")
   failureCode           String?                @map("failure_code")
   failureMessage        String?                @map("failure_message")

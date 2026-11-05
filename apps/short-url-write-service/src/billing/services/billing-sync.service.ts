@@ -75,6 +75,7 @@ export class BillingSyncService {
       amount: glomoPayment.requested_amount,
       currency: glomoPayment.requested_currency,
       status: glomoPayment.status,
+      complianceStatus: glomoPayment.compliance_status ?? null,
       paidAt: glomoPayment.paid_at ? new Date(glomoPayment.paid_at) : null,
       failureCode: glomoPayment.error_code ?? null,
       failureMessage: glomoPayment.error_description ?? null,

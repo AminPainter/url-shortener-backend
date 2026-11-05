@@ -390,6 +390,7 @@ describe('Billing (e2e)', () => {
         id: 'payt_renewal1',
         subscription_id: subscriptionId,
         status: 'success',
+        compliance_status: 'under_review',
         requested_amount: 500,
         requested_currency: 'USD',
         paid_at: new Date().toISOString(),
@@ -400,9 +401,15 @@ describe('Billing (e2e)', () => {
     expect(
       await app.get(ShortUrlsDbService).billingPayment.findMany({
         where: { partnerPaymentId: 'payt_renewal1' },
-        select: { sequence: true, status: true },
+        select: { sequence: true, status: true, complianceStatus: true },
       }),
-    ).toEqual([{ sequence: 'SUBSEQUENT', status: 'success' }]);
+    ).toEqual([
+      {
+        sequence: 'SUBSEQUENT',
+        status: 'success',
+        complianceStatus: 'under_review',
+      },
+    ]);
     expect((await getSubscription()).json()).toMatchObject({
       plan: 'PRO',
       billing: { currentPeriodEnd: expect.stringContaining(futureDate(60)) },
