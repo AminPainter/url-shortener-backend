@@ -22,7 +22,7 @@ export class GlomoCustomersClient {
     try {
       const created = await this.glomoHttpClient.request<{ id: string }>(
         'POST',
-        '/customer',
+        '/v1/customer',
         { ...customer, customer_type: 'individual' },
       );
       return created.id;
@@ -30,7 +30,7 @@ export class GlomoCustomersClient {
       if (!this.isEmailTaken(error)) throw error;
       const existing = await this.glomoHttpClient.request<{
         data: { id: string }[];
-      }>('GET', '/customer', undefined, { email_address: customer.email });
+      }>('GET', '/v1/customer', undefined, { email_address: customer.email });
       const [existingCustomer] = existing.data;
       if (!existingCustomer) throw error;
       return existingCustomer.id;

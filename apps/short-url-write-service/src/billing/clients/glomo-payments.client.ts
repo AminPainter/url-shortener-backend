@@ -27,7 +27,7 @@ export class GlomoPaymentsClient {
   get(paymentId: string) {
     return this.glomoHttpClient.request<GlomoPayment>(
       'GET',
-      `/payment/${encodeURIComponent(paymentId)}`,
+      `/v1/payment/${encodeURIComponent(paymentId)}`,
     );
   }
 }

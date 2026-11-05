@@ -33,7 +33,7 @@ export class GlomoSubscriptionsClient {
   create(subscription: GlomoSubscriptionInput) {
     return this.glomoHttpClient.request<GlomoSubscription>(
       'POST',
-      '/subscriptions',
+      '/v1/subscriptions',
       {
         customer_id: subscription.customerId,
         product_name: subscription.productName,
@@ -56,14 +56,14 @@ export class GlomoSubscriptionsClient {
   get(subscriptionId: string) {
     return this.glomoHttpClient.request<GlomoSubscription>(
       'GET',
-      `/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
     );
   }
 
   async cancel(subscriptionId: string) {
     await this.glomoHttpClient.request(
       'PATCH',
-      `/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
     );
   }
 }

@@ -19,7 +19,7 @@ import { ShortUrlWriteServiceModule } from '../src/short-url-write-service.modul
 const GLOMO_SECRET_KEY = 'test-glomo-secret-key';
 const GLOMO_WEBHOOK_SECRET = 'whsec_test-webhook-secret';
 
-process.env.GLOMO_API_BASE_URL = 'https://glomo.invalid/api/v1';
+process.env.GLOMO_API_BASE_URL = 'https://glomo.invalid/api';
 process.env.GLOMO_SECRET_KEY = GLOMO_SECRET_KEY;
 process.env.GLOMO_PUBLIC_KEY = 'test_public-key';
 process.env.GLOMO_WEBHOOK_SECRET = GLOMO_WEBHOOK_SECRET;
