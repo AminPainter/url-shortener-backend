@@ -6,7 +6,7 @@ type Plan = 'FREE' | 'PRO' | 'BUSINESS';
 
 export interface EntitlementSource {
   id: bigint;
-  userId: bigint;
+  userId: string;
   plan: Plan;
   status: string;
   currentPeriodEnd: Date | null;
@@ -26,13 +26,13 @@ export class SubscriptionsService {
     return { items: PLANS };
   }
 
-  async getPlan(userId: bigint) {
+  async getPlan(userId: string) {
     const subscriptionPlan =
       await this.subscriptionsRepository.findPlan(userId);
     return this.planDetails(this.effectivePlan(subscriptionPlan));
   }
 
-  async getSubscription(userId: bigint) {
+  async getSubscription(userId: string) {
     const [subscriptionPlan, linkCount] = await Promise.all([
       this.subscriptionsRepository.findPlan(userId),
       this.subscriptionsRepository.countLinks(userId),

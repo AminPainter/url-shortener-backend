@@ -30,7 +30,7 @@ const futureDate = (days: number) =>
 describe('Billing (e2e)', () => {
   let app: NestFastifyApplication;
   let authMicroservice: INestMicroservice;
-  let userId: bigint;
+  let userId: string;
   let accessToken: string;
   let subscriptionCounter = 0;
   const glomoSubscriptions = new Map<string, Record<string, unknown>>();
@@ -120,7 +120,7 @@ describe('Billing (e2e)', () => {
         'base64',
       ).toString(),
     }).signAsync(
-      { sub: userId.toString() },
+      { sub: userId },
       { algorithm: 'RS256', expiresIn: '1h', issuer: 'auth-service' },
     );
   });

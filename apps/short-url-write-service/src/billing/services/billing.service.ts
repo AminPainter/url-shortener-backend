@@ -41,7 +41,7 @@ export class BillingService {
     private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
   ) {}
 
-  async startCheckout(userId: bigint, plan: PaidPlan, interval: Interval) {
+  async startCheckout(userId: string, plan: PaidPlan, interval: Interval) {
     const userProfile = await this.usersClient.findById(userId);
     if (!userProfile.name || !userProfile.address) {
       throw new ProfileIncompleteError();
@@ -75,7 +75,7 @@ export class BillingService {
         billingCycles: GLOMO_MAX_BILLING_CYCLES[interval],
         startDate: today,
         expiresAt: this.utcDate(1),
-        notes: { user_id: userId.toString() },
+        notes: { user_id: userId },
       });
       await this.billingRepository.createSubscription({
         userId,
@@ -90,7 +90,7 @@ export class BillingService {
   }
 
   async confirmCheckout(
-    userId: bigint,
+    userId: string,
     { subscriptionId, paymentId, status, signature }: ConfirmCheckoutDto,
   ) {
     const billingSubscription =
@@ -127,7 +127,7 @@ export class BillingService {
     return this.subscriptionsService.getSubscription(userId);
   }
 
-  async cancel(userId: bigint) {
+  async cancel(userId: string) {
     await this.billingLock.withLock(userId, async () => {
       const billingSubscription =
         await this.billingRepository.findCancellableSubscription(userId);
@@ -148,7 +148,7 @@ export class BillingService {
     return this.subscriptionsService.getSubscription(userId);
   }
 
-  private async ensureCustomer(userId: bigint, userProfile: UserProfile) {
+  private async ensureCustomer(userId: string, userProfile: UserProfile) {
     const existingCustomerId =
       await this.billingRepository.findCustomerId(userId);
     if (existingCustomerId) return existingCustomerId;

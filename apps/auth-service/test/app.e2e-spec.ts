@@ -9,6 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthDbService } from '@app/auth-db';
 import { AuthServiceModule } from './../src/auth-service.module';
 
+const UUID_V7 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 describe('AuthService (e2e)', () => {
   let app: NestFastifyApplication;
   let email: string;
@@ -46,7 +49,7 @@ describe('AuthService (e2e)', () => {
     const response = await signup({ email, password: 'correct-horse' });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({
-      id: expect.stringMatching(/^\d+$/),
+      id: expect.stringMatching(UUID_V7),
       email,
     });
   });
@@ -181,7 +184,7 @@ describe('AuthService (e2e)', () => {
       headers: { authorization },
     });
     expect(profile.json()).toEqual({
-      id: expect.stringMatching(/^\d+$/),
+      id: expect.stringMatching(UUID_V7),
       email,
       name: 'Test Payer',
       address: { ...billingAddress, country: 'IND' },

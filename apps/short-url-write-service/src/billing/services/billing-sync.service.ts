@@ -22,7 +22,7 @@ type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 interface TrackedSubscription {
   id: bigint;
-  userId: bigint;
+  userId: string;
   plan: 'FREE' | 'PRO' | 'BUSINESS';
   interval: 'MONTH' | 'YEAR';
   status: SubscriptionStatus;

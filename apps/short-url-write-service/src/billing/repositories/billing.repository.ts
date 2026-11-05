@@ -48,7 +48,7 @@ export class BillingRepository {
     private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
   ) {}
 
-  async findCustomerId(userId: bigint) {
+  async findCustomerId(userId: string) {
     const billingCustomer =
       await this.transactionHost.tx.billingCustomer.findUnique({
         where: { userId_partner: { userId, partner: PARTNER } },
@@ -57,7 +57,7 @@ export class BillingRepository {
     return billingCustomer?.partnerCustomerId ?? null;
   }
 
-  saveCustomer(userId: bigint, partnerCustomerId: string) {
+  saveCustomer(userId: string, partnerCustomerId: string) {
     return this.transactionHost.tx.billingCustomer.upsert({
       where: { userId_partner: { userId, partner: PARTNER } },
       create: { userId, partner: PARTNER, partnerCustomerId },
@@ -65,7 +65,7 @@ export class BillingRepository {
     });
   }
 
-  findLiveSubscription(userId: bigint) {
+  findLiveSubscription(userId: string) {
     return this.transactionHost.tx.billingSubscription.findFirst({
       where: { userId, status: { in: [...LIVE_SUBSCRIPTION_STATUSES] } },
       select: SUBSCRIPTION_FIELDS,
@@ -73,7 +73,7 @@ export class BillingRepository {
   }
 
   findPendingCheckout(
-    userId: bigint,
+    userId: string,
     plan: Plan,
     interval: Interval,
     createdAfter: Date,
@@ -92,7 +92,7 @@ export class BillingRepository {
   }
 
   createSubscription(subscription: {
-    userId: bigint;
+    userId: string;
     partnerSubscriptionId: string;
     plan: Plan;
     interval: Interval;
@@ -105,7 +105,7 @@ export class BillingRepository {
     });
   }
 
-  async findUserSubscription(userId: bigint, partnerSubscriptionId: string) {
+  async findUserSubscription(userId: string, partnerSubscriptionId: string) {
     const billingSubscription =
       await this.transactionHost.tx.billingSubscription.findFirst({
         where: { userId, partner: PARTNER, partnerSubscriptionId },
@@ -115,7 +115,7 @@ export class BillingRepository {
     return billingSubscription;
   }
 
-  async findCancellableSubscription(userId: bigint) {
+  async findCancellableSubscription(userId: string) {
     const billingSubscription =
       await this.transactionHost.tx.billingSubscription.findFirst({
         where: {

@@ -8,7 +8,7 @@ export class SubscriptionController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
   @Get()
-  get(@UserId() userId: bigint) {
+  get(@UserId() userId: string) {
     return this.subscriptionsService.getSubscription(userId);
   }
 }

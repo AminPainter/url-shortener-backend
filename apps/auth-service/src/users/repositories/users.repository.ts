@@ -21,6 +21,7 @@ export class UsersRepository {
         select: { id: true, email: true },
       });
     } catch (error) {
+      // TODO: find a generic pattern for translating Prisma errors (P2002, P2025, ...) into domain errors instead of repeating this check in every repository.
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -38,7 +39,7 @@ export class UsersRepository {
     });
   }
 
-  async findProfile(id: bigint) {
+  async findProfile(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: PROFILE_FIELDS,
@@ -48,7 +49,7 @@ export class UsersRepository {
   }
 
   async updateProfile(
-    id: bigint,
+    id: string,
     name: string,
     address: Prisma.InputJsonObject,
   ) {

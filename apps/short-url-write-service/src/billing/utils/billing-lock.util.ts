@@ -8,7 +8,7 @@ const LOCK_EXTENSION_THRESHOLD_MS = 2_000;
 export class BillingLock {
   constructor(private readonly redlockService: RedlockService) {}
 
-  withLock<T>(userId: bigint, criticalSection: () => Promise<T>) {
+  withLock<T>(userId: string, criticalSection: () => Promise<T>) {
     return this.redlockService.withLock(
       `lock:billing:user:${userId}`,
       LOCK_TTL_MS,

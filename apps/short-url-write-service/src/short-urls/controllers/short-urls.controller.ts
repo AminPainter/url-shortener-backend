@@ -10,12 +10,12 @@ export class ShortUrlsController {
   constructor(private readonly shortUrlsService: ShortUrlsService) {}
 
   @Post()
-  create(@Body() { longUrl }: CreateShortUrlDto, @UserId() userId: bigint) {
+  create(@Body() { longUrl }: CreateShortUrlDto, @UserId() userId: string) {
     return this.shortUrlsService.create(longUrl, userId);
   }
 
   @Get()
-  list(@Query() { cursor, limit }: ListShortUrlsDto, @UserId() userId: bigint) {
+  list(@Query() { cursor, limit }: ListShortUrlsDto, @UserId() userId: string) {
     return this.shortUrlsService.list(userId, limit, cursor);
   }
 }

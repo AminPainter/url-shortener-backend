@@ -9,12 +9,12 @@ export class MeController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  get(@UserId() userId: bigint) {
+  get(@UserId() userId: string) {
     return this.usersService.getProfile(userId);
   }
 
   @Patch()
-  update(@Body() updateProfileDto: UpdateProfileDto, @UserId() userId: bigint) {
+  update(@Body() updateProfileDto: UpdateProfileDto, @UserId() userId: string) {
     return this.usersService.updateProfile(userId, updateProfileDto);
   }
 }

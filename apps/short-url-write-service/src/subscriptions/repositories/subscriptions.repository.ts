@@ -10,7 +10,7 @@ export class SubscriptionsRepository {
     private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
   ) {}
 
-  findPlan(userId: bigint) {
+  findPlan(userId: string) {
     return this.transactionHost.tx.subscriptionPlan.findUnique({
       where: { userId },
       select: {
@@ -28,11 +28,11 @@ export class SubscriptionsRepository {
     });
   }
 
-  countLinks(userId: bigint) {
+  countLinks(userId: string) {
     return this.transactionHost.tx.shortUrl.count({ where: { userId } });
   }
 
-  grantPlan(userId: bigint, plan: Plan, billingSubscriptionId: bigint) {
+  grantPlan(userId: string, plan: Plan, billingSubscriptionId: bigint) {
     return this.transactionHost.tx.subscriptionPlan.upsert({
       where: { userId },
       create: { userId, plan, billingSubscriptionId, validUntil: null },
@@ -41,7 +41,7 @@ export class SubscriptionsRepository {
   }
 
   limitPlanValidity(
-    userId: bigint,
+    userId: string,
     billingSubscriptionId: bigint,
     validUntil: Date,
   ) {

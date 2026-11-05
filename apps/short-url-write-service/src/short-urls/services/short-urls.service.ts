@@ -19,7 +19,7 @@ export class ShortUrlsService {
     private readonly userLinkLock: UserLinkLock,
   ) {}
 
-  async create(longUrl: string, userId: bigint) {
+  async create(longUrl: string, userId: string) {
     const { linkLimit } = await this.subscriptionsService.getPlan(userId);
     const shortCode = Array.from(
       { length: 7 },
@@ -34,7 +34,7 @@ export class ShortUrlsService {
     );
   }
 
-  async list(userId: bigint, limit: number, cursor?: bigint) {
+  async list(userId: string, limit: number, cursor?: bigint) {
     const shortUrls = await this.shortUrlsRepository.findByUser(
       userId,
       limit + 1,

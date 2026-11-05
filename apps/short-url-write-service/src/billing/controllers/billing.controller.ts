@@ -12,7 +12,7 @@ export class BillingController {
   @Post('checkout')
   startCheckout(
     @Body() { plan, interval }: StartCheckoutDto,
-    @UserId() userId: bigint,
+    @UserId() userId: string,
   ) {
     return this.billingService.startCheckout(userId, plan, interval);
   }
@@ -21,14 +21,14 @@ export class BillingController {
   @HttpCode(200)
   confirmCheckout(
     @Body() confirmCheckoutDto: ConfirmCheckoutDto,
-    @UserId() userId: bigint,
+    @UserId() userId: string,
   ) {
     return this.billingService.confirmCheckout(userId, confirmCheckoutDto);
   }
 
   @Post('cancel')
   @HttpCode(200)
-  cancel(@UserId() userId: bigint) {
+  cancel(@UserId() userId: string) {
     return this.billingService.cancel(userId);
   }
 }

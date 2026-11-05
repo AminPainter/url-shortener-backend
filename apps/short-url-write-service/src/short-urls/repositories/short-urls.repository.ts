@@ -8,18 +8,18 @@ export class ShortUrlsRepository {
     private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
   ) {}
 
-  countByUser(userId: bigint) {
+  countByUser(userId: string) {
     return this.transactionHost.tx.shortUrl.count({ where: { userId } });
   }
 
-  create(shortCode: string, longUrl: string, userId: bigint) {
+  create(shortCode: string, longUrl: string, userId: string) {
     return this.transactionHost.tx.shortUrl.create({
       data: { shortCode, longUrl, userId },
       select: { shortCode: true, longUrl: true },
     });
   }
 
-  findByUser(userId: bigint, take: number, beforeId?: bigint) {
+  findByUser(userId: string, take: number, beforeId?: bigint) {
     return this.transactionHost.tx.shortUrl.findMany({
       where: { userId, id: beforeId ? { lt: beforeId } : undefined },
       orderBy: { id: 'desc' },

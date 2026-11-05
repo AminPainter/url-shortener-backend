@@ -31,11 +31,11 @@ export class UsersClient {
     @Inject(AUTH_SERVICE) private readonly clientProxy: ClientProxy,
   ) {}
 
-  async findById(userId: bigint) {
+  async findById(userId: string) {
     try {
       return await firstValueFrom(
         this.clientProxy
-          .send<UserProfile>(FIND_USER_BY_ID, { id: userId.toString() })
+          .send<UserProfile>(FIND_USER_BY_ID, { id: userId })
           .pipe(timeout(AUTH_SERVICE_TIMEOUT_MS)),
       );
     } catch (error) {
