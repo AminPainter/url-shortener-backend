@@ -1,31 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@app/short-urls-db';
+import { BillingSubscriptionStatus, Prisma } from '@app/short-urls-db';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service';
-import { GlomoPayment, GlomoSubscription } from '../clients/glomo.client';
+import { GlomoPayment } from '../clients/glomo-payments.client';
+import { GlomoSubscription } from '../clients/glomo-subscriptions.client';
 import { BillingRepository } from '../repositories/billing.repository';
-
-const SUBSCRIPTION_STATUSES = [
-  'CREATED',
-  'AUTHORIZED',
-  'ACTIVE',
-  'PAUSED',
-  'HALTED',
-  'ACTION_REQUIRED',
-  'UNDER_REVIEW',
-  'COMPLETED',
-  'CANCELLED',
-  'EXPIRED',
-  'FAILED',
-] as const;
-
-type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 interface TrackedSubscription {
   id: bigint;
   userId: string;
   plan: 'FREE' | 'PRO' | 'BUSINESS';
   interval: 'MONTH' | 'YEAR';
-  status: SubscriptionStatus;
+  status: BillingSubscriptionStatus;
   currentPeriodEnd: Date | null;
 }
 
@@ -82,9 +67,13 @@ export class BillingSyncService {
     });
   }
 
-  private toStatus(glomoStatus: string, fallback: SubscriptionStatus) {
+  private toStatus(glomoStatus: string, fallback: BillingSubscriptionStatus) {
     const status = glomoStatus.toUpperCase();
-    return SUBSCRIPTION_STATUSES.find((known) => known === status) ?? fallback;
+    return (
+      Object.values(BillingSubscriptionStatus).find(
+        (known) => known === status,
+      ) ?? fallback
+    );
   }
 
   private parseDate(value: string | null | undefined) {

@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { ShortUrlsTransactionalAdapter } from '@app/short-urls-db';
+import { GlomoPayment } from '../clients/glomo-payments.client';
 import {
-  GlomoClient,
-  GlomoPayment,
   GlomoSubscription,
-} from '../clients/glomo.client';
+  GlomoSubscriptionsClient,
+} from '../clients/glomo-subscriptions.client';
 import { InvalidSignatureError } from '../errors/invalid-signature.error';
 import { BillingRepository } from '../repositories/billing.repository';
 import { WebhookEventsRepository } from '../repositories/webhook-events.repository';
@@ -23,7 +23,7 @@ interface GlomoWebhook {
 export class GlomoWebhooksService {
   constructor(
     private readonly glomoSignature: GlomoSignature,
-    private readonly glomoClient: GlomoClient,
+    private readonly glomoSubscriptionsClient: GlomoSubscriptionsClient,
     private readonly billingRepository: BillingRepository,
     private readonly webhookEventsRepository: WebhookEventsRepository,
     private readonly billingSyncService: BillingSyncService,
@@ -43,13 +43,14 @@ export class GlomoWebhooksService {
       partnerSubscriptionId,
     );
     await this.transactionHost.withTransaction(async () => {
-      const webhookEventId = await this.webhookEventsRepository.record({
-        dedupeKey,
-        entityType: webhook.entity_type,
-        eventType: webhook.event_type,
-        entityId: webhook.data.id ?? null,
-        payload: webhook as object,
-      });
+      const webhookEventId =
+        await this.webhookEventsRepository.idempotentlyRecord({
+          dedupeKey,
+          entityType: webhook.entity_type,
+          eventType: webhook.event_type,
+          entityId: webhook.data.id ?? null,
+          payload: webhook as object,
+        });
       if (webhookEventId === null) return;
       const billingSubscription = partnerSubscriptionId
         ? await this.billingRepository.findByPartnerSubscriptionId(
@@ -108,6 +109,6 @@ export class GlomoWebhooksService {
     ) {
       return null;
     }
-    return this.glomoClient.getSubscription(partnerSubscriptionId);
+    return this.glomoSubscriptionsClient.get(partnerSubscriptionId);
   }
 }

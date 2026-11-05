@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
-import { Prisma, ShortUrlsTransactionalAdapter } from '@app/short-urls-db';
+import {
+  BillingSubscriptionStatus,
+  Prisma,
+  ShortUrlsTransactionalAdapter,
+} from '@app/short-urls-db';
 import {
   CANCELLABLE_SUBSCRIPTION_STATUSES,
   LIVE_SUBSCRIPTION_STATUSES,
@@ -24,7 +28,7 @@ const SUBSCRIPTION_FIELDS = {
 } as const;
 
 export interface SubscriptionChanges {
-  status: Prisma.BillingSubscriptionUpdateInput['status'];
+  status: BillingSubscriptionStatus;
   currentPeriodEnd: Date | null;
   cancelledAt: Date | null;
   haltReason: Prisma.InputJsonValue | typeof Prisma.DbNull;
@@ -49,7 +53,7 @@ export class BillingRepository {
     private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
   ) {}
 
-  async findCustomerId(userId: string) {
+  async findPartnerCustomerId(userId: string) {
     const billingCustomer =
       await this.transactionHost.tx.billingCustomer.findUnique({
         where: { userId_partner: { userId, partner: PARTNER } },
@@ -68,7 +72,7 @@ export class BillingRepository {
 
   findLiveSubscription(userId: string) {
     return this.transactionHost.tx.billingSubscription.findFirst({
-      where: { userId, status: { in: [...LIVE_SUBSCRIPTION_STATUSES] } },
+      where: { userId, status: { in: LIVE_SUBSCRIPTION_STATUSES } },
       select: SUBSCRIPTION_FIELDS,
     });
   }
@@ -84,7 +88,7 @@ export class BillingRepository {
         userId,
         plan,
         interval,
-        status: 'CREATED',
+        status: BillingSubscriptionStatus.CREATED,
         createdAt: { gte: createdAfter },
       },
       orderBy: { id: 'desc' },
@@ -101,7 +105,11 @@ export class BillingRepository {
     currency: string;
   }) {
     return this.transactionHost.tx.billingSubscription.create({
-      data: { ...subscription, partner: PARTNER, status: 'CREATED' },
+      data: {
+        ...subscription,
+        partner: PARTNER,
+        status: BillingSubscriptionStatus.CREATED,
+      },
       select: SUBSCRIPTION_FIELDS,
     });
   }
@@ -121,7 +129,7 @@ export class BillingRepository {
       await this.transactionHost.tx.billingSubscription.findFirst({
         where: {
           userId,
-          status: { in: [...CANCELLABLE_SUBSCRIPTION_STATUSES] },
+          status: { in: CANCELLABLE_SUBSCRIPTION_STATUSES },
         },
         select: SUBSCRIPTION_FIELDS,
       });

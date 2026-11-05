@@ -18,7 +18,7 @@ export class WebhookEventsRepository {
     return webhookEvent !== null;
   }
 
-  async record(webhookEvent: {
+  async idempotentlyRecord(webhookEvent: {
     dedupeKey: string;
     entityType: string;
     eventType: string;

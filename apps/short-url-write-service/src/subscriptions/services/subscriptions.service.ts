@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { BillingSubscriptionStatus } from '@app/short-urls-db';
 import { PLANS } from '../constants/plans';
 import { SubscriptionsRepository } from '../repositories/subscriptions.repository';
 
@@ -8,13 +9,24 @@ export interface EntitlementSource {
   id: bigint;
   userId: string;
   plan: Plan;
-  status: string;
+  status: BillingSubscriptionStatus;
   currentPeriodEnd: Date | null;
 }
 
-const GRANTING_STATUSES = new Set(['ACTIVE', 'AUTHORIZED']);
-const GRACE_STATUSES = new Set(['CANCELLED', 'HALTED', 'PAUSED']);
-const ENDED_STATUSES = new Set(['EXPIRED', 'FAILED', 'COMPLETED']);
+const GRANTING_STATUSES = new Set<BillingSubscriptionStatus>([
+  BillingSubscriptionStatus.ACTIVE,
+  BillingSubscriptionStatus.AUTHORIZED,
+]);
+const GRACE_STATUSES = new Set<BillingSubscriptionStatus>([
+  BillingSubscriptionStatus.CANCELLED,
+  BillingSubscriptionStatus.HALTED,
+  BillingSubscriptionStatus.PAUSED,
+]);
+const ENDED_STATUSES = new Set<BillingSubscriptionStatus>([
+  BillingSubscriptionStatus.EXPIRED,
+  BillingSubscriptionStatus.FAILED,
+  BillingSubscriptionStatus.COMPLETED,
+]);
 
 @Injectable()
 export class SubscriptionsService {

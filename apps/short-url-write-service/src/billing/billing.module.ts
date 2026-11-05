@@ -4,7 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { RedisLockModule } from '@app/lock';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersClientModule } from '../users-client/users-client.module';
-import { GlomoClient } from './clients/glomo.client';
+import { GlomoCustomersClient } from './clients/glomo-customers.client';
+import { GlomoHttpClient } from './clients/glomo-http.client';
+import { GlomoPaymentsClient } from './clients/glomo-payments.client';
+import { GlomoSubscriptionsClient } from './clients/glomo-subscriptions.client';
 import { GLOMO_HTTP_TIMEOUT_MS } from './constants/glomo';
 import { BillingController } from './controllers/billing.controller';
 import { GlomoWebhooksController } from './controllers/glomo-webhooks.controller';
@@ -40,7 +43,10 @@ import { GlomoSignature } from './utils/glomo-signature.util';
     GlomoWebhooksService,
     BillingRepository,
     WebhookEventsRepository,
-    GlomoClient,
+    GlomoHttpClient,
+    GlomoCustomersClient,
+    GlomoSubscriptionsClient,
+    GlomoPaymentsClient,
     GlomoSignature,
     BillingLock,
   ],

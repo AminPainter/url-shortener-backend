@@ -11,7 +11,9 @@ import { Transport } from '@nestjs/microservices';
 import { AuthDbService } from '@app/auth-db';
 import { ShortUrlsDbService } from '@app/short-urls-db';
 import { AuthServiceModule } from '../../auth-service/src/auth-service.module';
-import { GlomoClient } from '../src/billing/clients/glomo.client';
+import { GlomoCustomersClient } from '../src/billing/clients/glomo-customers.client';
+import { GlomoPaymentsClient } from '../src/billing/clients/glomo-payments.client';
+import { GlomoSubscriptionsClient } from '../src/billing/clients/glomo-subscriptions.client';
 import { ShortUrlWriteServiceModule } from '../src/short-url-write-service.module';
 
 const GLOMO_SECRET_KEY = 'test-glomo-secret-key';
@@ -35,9 +37,12 @@ describe('Billing (e2e)', () => {
   let subscriptionCounter = 0;
   const glomoSubscriptions = new Map<string, Record<string, unknown>>();
 
-  const glomoClient = {
-    ensureCustomer: vi.fn(async () => 'cust_test123'),
-    createSubscription: vi.fn(async () => {
+  const glomoCustomersClient = {
+    ensure: vi.fn(async () => 'cust_test123'),
+  };
+
+  const glomoSubscriptionsClient = {
+    create: vi.fn(async () => {
       const id = `sub_test${Date.now()}${subscriptionCounter++}`;
       glomoSubscriptions.set(id, {
         id,
@@ -47,15 +52,18 @@ describe('Billing (e2e)', () => {
       });
       return glomoSubscriptions.get(id);
     }),
-    getSubscription: vi.fn(async (id: string) => glomoSubscriptions.get(id)),
-    cancelSubscription: vi.fn(async (id: string) => {
+    get: vi.fn(async (id: string) => glomoSubscriptions.get(id)),
+    cancel: vi.fn(async (id: string) => {
       glomoSubscriptions.set(id, {
         ...glomoSubscriptions.get(id),
         status: 'cancelled',
         cancelled_at: futureDate(0),
       });
     }),
-    getPayment: vi.fn(async (id: string) => ({
+  };
+
+  const glomoPaymentsClient = {
+    get: vi.fn(async (id: string) => ({
       id,
       subscription_id: [...glomoSubscriptions.keys()].at(-1),
       status: 'success',
@@ -87,8 +95,12 @@ describe('Billing (e2e)', () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [ShortUrlWriteServiceModule],
     })
-      .overrideProvider(GlomoClient)
-      .useValue(glomoClient)
+      .overrideProvider(GlomoCustomersClient)
+      .useValue(glomoCustomersClient)
+      .overrideProvider(GlomoSubscriptionsClient)
+      .useValue(glomoSubscriptionsClient)
+      .overrideProvider(GlomoPaymentsClient)
+      .useValue(glomoPaymentsClient)
       .compile();
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
@@ -224,7 +236,7 @@ describe('Billing (e2e)', () => {
       subscriptionId: expect.stringMatching(/^sub_/),
       publicKey: 'test_public-key',
     });
-    expect(glomoClient.ensureCustomer).toHaveBeenCalledWith({
+    expect(glomoCustomersClient.ensure).toHaveBeenCalledWith({
       name: 'Test Payer',
       email: expect.stringMatching(/@example\.com$/),
       address: '1 Main St',
@@ -233,7 +245,7 @@ describe('Billing (e2e)', () => {
       country: 'IND',
       pincode: '560001',
     });
-    expect(glomoClient.createSubscription).toHaveBeenCalledWith(
+    expect(glomoSubscriptionsClient.create).toHaveBeenCalledWith(
       expect.objectContaining({
         customerId: 'cust_test123',
         amount: 500,
@@ -248,7 +260,7 @@ describe('Billing (e2e)', () => {
       interval: 'MONTH',
     });
     expect(retry.json().subscriptionId).toBe(first.json().subscriptionId);
-    expect(glomoClient.createSubscription).toHaveBeenCalledTimes(1);
+    expect(glomoSubscriptionsClient.create).toHaveBeenCalledTimes(1);
   });
 
   it('POST /api/billing/checkout rejects an incomplete profile', async () => {
@@ -261,7 +273,7 @@ describe('Billing (e2e)', () => {
     });
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({ errorCode: 'PROFILE_INCOMPLETE' });
-    expect(glomoClient.createSubscription).not.toHaveBeenCalled();
+    expect(glomoSubscriptionsClient.create).not.toHaveBeenCalled();
   });
 
   it('POST /api/billing/checkout rejects an invalid plan', async () => {

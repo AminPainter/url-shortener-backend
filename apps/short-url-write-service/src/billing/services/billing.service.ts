@@ -5,10 +5,13 @@ import { ShortUrlsTransactionalAdapter } from '@app/short-urls-db';
 import { PLANS } from '../../subscriptions/constants/plans';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service';
 import {
+  UserAddress,
   UsersClient,
   UserProfile,
 } from '../../users-client/clients/users.client';
-import { GlomoClient } from '../clients/glomo.client';
+import { GlomoCustomersClient } from '../clients/glomo-customers.client';
+import { GlomoPaymentsClient } from '../clients/glomo-payments.client';
+import { GlomoSubscriptionsClient } from '../clients/glomo-subscriptions.client';
 import {
   GLOMO_INTERVAL_TYPES,
   GLOMO_MAX_BILLING_CYCLES,
@@ -27,6 +30,8 @@ import { BillingSyncService } from './billing-sync.service';
 type PaidPlan = 'PRO' | 'BUSINESS';
 type Interval = 'MONTH' | 'YEAR';
 
+type CompleteUserProfile = UserProfile & { name: string; address: UserAddress };
+
 @Injectable()
 export class BillingService {
   constructor(
@@ -34,7 +39,9 @@ export class BillingService {
     private readonly billingSyncService: BillingSyncService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly usersClient: UsersClient,
-    private readonly glomoClient: GlomoClient,
+    private readonly glomoCustomersClient: GlomoCustomersClient,
+    private readonly glomoSubscriptionsClient: GlomoSubscriptionsClient,
+    private readonly glomoPaymentsClient: GlomoPaymentsClient,
     private readonly glomoSignature: GlomoSignature,
     private readonly billingLock: BillingLock,
     private readonly configService: ConfigService,
@@ -43,9 +50,7 @@ export class BillingService {
 
   async startCheckout(userId: string, plan: PaidPlan, interval: Interval) {
     const userProfile = await this.usersClient.findById(userId);
-    if (!userProfile.name || !userProfile.address) {
-      throw new ProfileIncompleteError();
-    }
+    this.validateProfile(userProfile);
     return this.billingLock.withLock(userId, async () => {
       if (await this.billingRepository.findLiveSubscription(userId)) {
         throw new AlreadySubscribedError();
@@ -64,7 +69,7 @@ export class BillingService {
       const prices = PLANS.find(
         (planDetails) => planDetails.plan === plan,
       )!.prices!;
-      const glomoSubscription = await this.glomoClient.createSubscription({
+      const glomoSubscription = await this.glomoSubscriptionsClient.create({
         customerId,
         productName: GLOMO_PRODUCT_NAMES[plan],
         productDescription: GLOMO_PRODUCT_DESCRIPTION,
@@ -91,27 +96,16 @@ export class BillingService {
 
   async confirmCheckout(
     userId: string,
-    { subscriptionId, paymentId, status, signature }: ConfirmCheckoutDto,
+    confirmCheckoutDto: ConfirmCheckoutDto,
   ) {
+    const { subscriptionId, paymentId } = confirmCheckoutDto;
     const billingSubscription =
       await this.billingRepository.findUserSubscription(userId, subscriptionId);
-    if (
-      !this.glomoSignature.isValidCheckout(
-        subscriptionId,
-        paymentId,
-        status,
-        signature,
-      )
-    ) {
-      throw new InvalidSignatureError();
-    }
+    this.validateCheckoutSignature(confirmCheckoutDto);
     const [glomoPayment, glomoSubscription] = await Promise.all([
-      this.glomoClient.getPayment(paymentId),
-      this.glomoClient.getSubscription(subscriptionId),
+      this.glomoPaymentsClient.get(paymentId),
+      this.glomoSubscriptionsClient.get(subscriptionId),
     ]);
-    if (glomoPayment.subscription_id !== subscriptionId) {
-      throw new InvalidSignatureError();
-    }
     await this.transactionHost.withTransaction(async () => {
       await this.billingSyncService.recordPayment(
         billingSubscription.id,
@@ -131,10 +125,10 @@ export class BillingService {
     await this.billingLock.withLock(userId, async () => {
       const billingSubscription =
         await this.billingRepository.findCancellableSubscription(userId);
-      await this.glomoClient.cancelSubscription(
+      await this.glomoSubscriptionsClient.cancel(
         billingSubscription.partnerSubscriptionId,
       );
-      const glomoSubscription = await this.glomoClient.getSubscription(
+      const glomoSubscription = await this.glomoSubscriptionsClient.get(
         billingSubscription.partnerSubscriptionId,
       );
       await this.transactionHost.withTransaction(() =>
@@ -148,18 +142,44 @@ export class BillingService {
     return this.subscriptionsService.getSubscription(userId);
   }
 
-  private async ensureCustomer(userId: string, userProfile: UserProfile) {
+  private validateProfile(
+    userProfile: UserProfile,
+  ): asserts userProfile is CompleteUserProfile {
+    if (!userProfile.name || !userProfile.address) {
+      throw new ProfileIncompleteError();
+    }
+  }
+
+  private validateCheckoutSignature({
+    subscriptionId,
+    paymentId,
+    status,
+    signature,
+  }: ConfirmCheckoutDto) {
+    if (
+      !this.glomoSignature.isValidCheckout(
+        subscriptionId,
+        paymentId,
+        status,
+        signature,
+      )
+    ) {
+      throw new InvalidSignatureError();
+    }
+  }
+
+  private async ensureCustomer(
+    userId: string,
+    userProfile: CompleteUserProfile,
+  ) {
     const existingCustomerId =
-      await this.billingRepository.findCustomerId(userId);
+      await this.billingRepository.findPartnerCustomerId(userId);
     if (existingCustomerId) return existingCustomerId;
     const { name, address } = userProfile;
-    if (!name || !address) throw new ProfileIncompleteError();
-    const customerId = await this.glomoClient.ensureCustomer({
+    const customerId = await this.glomoCustomersClient.ensure({
       name,
       email: userProfile.email,
-      address: [address.addressLine1, address.addressLine2]
-        .filter(Boolean)
-        .join(', '),
+      address: address.streetAddress,
       city: address.city,
       state: address.state,
       country: address.country,

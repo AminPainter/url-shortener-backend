@@ -16,6 +16,7 @@ export interface UserAddress {
   state: string;
   country: string;
   pincode?: string;
+  streetAddress: string;
 }
 
 export interface UserProfile {
@@ -25,17 +26,34 @@ export interface UserProfile {
   address: UserAddress | null;
 }
 
+interface UserProfilePayload extends Omit<UserProfile, 'address'> {
+  address: Omit<UserAddress, 'streetAddress'> | null;
+}
+
 @Injectable()
 export class UsersClient {
   constructor(
     @Inject(AUTH_SERVICE) private readonly clientProxy: ClientProxy,
   ) {}
 
-  async findById(userId: string) {
+  async findById(userId: string): Promise<UserProfile> {
+    const { address, ...userProfile } = await this.fetchProfile(userId);
+    return {
+      ...userProfile,
+      address: address && {
+        ...address,
+        streetAddress: [address.addressLine1, address.addressLine2]
+          .filter(Boolean)
+          .join(', '),
+      },
+    };
+  }
+
+  private async fetchProfile(userId: string) {
     try {
       return await firstValueFrom(
         this.clientProxy
-          .send<UserProfile>(FIND_USER_BY_ID, { id: userId })
+          .send<UserProfilePayload>(FIND_USER_BY_ID, { id: userId })
           .pipe(timeout(AUTH_SERVICE_TIMEOUT_MS)),
       );
     } catch (error) {
