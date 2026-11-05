@@ -1,6 +1,6 @@
 # CutItShort backend
 
-High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind Kong. The frontend lives in a separate repo (`../frontend`) and only ever talks to Kong.
+High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind Kong. The frontend lives in a separate repo (`../cut-it-short-frontend`) and only ever talks to Kong.
 
 ## Coding rules (mandatory)
 - Write ZERO comments in code. No inline, block, JSDoc or TODO comments.
@@ -21,15 +21,22 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 
 ## Architecture
 - `apps/short-url-read-service`: redirect hot path, `GET /:code` → 302. Routes have no prefix.
-- `apps/short-url-write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`. `GET /api/short-urls?limit=&cursor=` (same JWT) lists the token user's links newest first as `{ items: [{ shortCode, longUrl, createdAt }], nextCursor }`; keyset pagination on `id` (`limit` 1-100, default 20), served by the `(user_id, id)` index. `GET /api/plans` (public) lists the plan catalog as `{ items: [{ plan, name, linkLimit }] }`; `GET /api/subscription` (same JWT) returns `{ plan, name, linkLimit, linkCount }`.
-- Subscription plans live in short-url-write-service (`subscriptions` feature, `shorturls.subscription_plans`, PK `user_id`, enum `Plan` FREE/PRO/BUSINESS). Limits come from the `PLANS` constant (Free 10, Pro 100, Business 1000 total links). No row means Free. Plans change only by a DB write; there is no switch endpoint and no payments. `POST /api/short-urls` holds the Redis lock `lock:short-urls:user:<userId>` (`@app/lock`, 10s TTL, auto-extended 1s before expiry), counts and inserts inside one transaction, and returns 403 `LINK_LIMIT_REACHED` at the limit; `ShortUrlsService.create` owns the transaction and the limit check and takes the lock through `UserLinkLock` (`short-urls/utils/user-link-lock.util.ts`), which holds the key and TTL policy. The lock wraps the transaction so it is released only after commit. It fails closed: when Redis is down, creates return 500.
-- `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). Only auth-service holds the private key; verifiers get the public key only.
+- `apps/short-url-write-service`: everything under the global prefix `/api`. `POST /api/short-urls` requires a Bearer JWT (passport-jwt, `JWT_PUBLIC_KEY`, RS256, issuer `auth-service`); the token `sub` becomes `ShortUrl.userId`. `GET /api/short-urls?limit=&cursor=` (same JWT) lists the token user's links newest first as `{ items: [{ shortCode, longUrl, createdAt }], nextCursor }`; keyset pagination on `id` (`limit` 1-100, default 20), served by the `(user_id, id)` index. `GET /api/plans` (public) lists the plan catalog as `{ items: [{ plan, name, linkLimit, prices }] }` (`prices` is `null` for Free, else `{ currency: 'USD', MONTH, YEAR }` in cents); `GET /api/subscription` (same JWT) returns `{ plan, name, linkLimit, prices, linkCount, billing }`, where `billing` is `{ status, interval, currentPeriodEnd, cancelledAt, validUntil }` or `null`.
+- Subscription plans live in short-url-write-service (`subscriptions` feature, `shorturls.subscription_plans`, PK `user_id`, enum `Plan` FREE/PRO/BUSINESS). Limits come from the `PLANS` constant (Free 10, Pro 100, Business 1000 total links). No row means Free, and so does a row whose `valid_until` has passed (lazy expiry, no cron). A row with `billing_subscription_id` null is a manual grant. `POST /api/short-urls` holds the Redis lock `lock:short-urls:user:<userId>` (`@app/lock`, 10s TTL, auto-extended 1s before expiry), counts and inserts inside one transaction, and returns 403 `LINK_LIMIT_REACHED` at the limit; `ShortUrlsService.create` owns the transaction and the limit check and takes the lock through `UserLinkLock` (`short-urls/utils/user-link-lock.util.ts`), which holds the key and TTL policy. The lock wraps the transaction so it is released only after commit. It fails closed: when Redis is down, creates return 500.
+- Billing (short-url-write-service `billing` feature) sells PRO/BUSINESS monthly or yearly through Glomo subscriptions (SDK checkout; card data never reaches us).
+  - `POST /api/billing/checkout` `{ plan, interval }` (JWT) reads the user from auth-service over TCP, returns 422 `PROFILE_INCOMPLETE` without name and address, 409 `ALREADY_SUBSCRIBED` when a live subscription exists, then creates or reuses today's Glomo customer and subscription and returns `{ subscriptionId, publicKey }`. Holds `lock:billing:user:<userId>`.
+  - `POST /api/billing/checkout/confirm` `{ subscriptionId, paymentId, status, signature }` verifies hex HMAC-SHA256 of `subscriptionId|paymentId|status` with `GLOMO_SECRET_KEY` (401 `INVALID_SIGNATURE`), then re-reads the payment and subscription from Glomo; the browser status is never trusted.
+  - `POST /api/billing/cancel` cancels at Glomo; the plan stays until `current_period_end`.
+  - `POST /api/webhooks/glomo` (no JWT) verifies `X-Glomopay-Signature` over the raw body (`rawBody: true` in `main.ts`) with `GLOMO_WEBHOOK_SECRET`, dedupes on sha256 of the body in `webhook_events` (`partner`, `dedupe_key`), and processes in one transaction; errors return 500 so Glomo retries.
+  - `BillingSyncService` owns every state transition; `SubscriptionsService.applyEntitlement` maps the Glomo status onto `subscription_plans` (ACTIVE/AUTHORIZED grant; CANCELLED/HALTED/PAUSED keep the plan until period end; EXPIRED/FAILED/COMPLETED end it).
+  - Tables: `billing_customers`, `billing_subscriptions` (partial unique index: one live subscription per user), `billing_payments` (Glomo payment ids, for reconciliation and refunds), `webhook_events` (generic, `partner` column). `GlomoClient` uses `@nestjs/axios`; Glomo failures become 502 `PAYMENT_GATEWAY_ERROR` and only method, path and status are logged.
+- `apps/auth-service`: global prefix `/api/auth`. Owns the `User` table. `POST /api/auth/signup` (email + password; email lowercased and unique; bcrypt, 12 rounds) and `POST /api/auth/login` (passport-local, `usernameField: 'email'`) returning `{ accessToken }`, an RS256 JWT signed with `JWT_PRIVATE_KEY`, 1h expiry, payload is only `sub` (no email in the token). `GET`/`PATCH /api/auth/me` (JWT, auth-service has its own `JwtStrategy`) read and update `{ name, address }`; `address` is jsonb `{ addressLine1, addressLine2?, city, state, country (ISO alpha-3), pincode? }`. auth-service is also a hybrid Nest app: a TCP microservice on `AUTH_INTERNAL_HOST:AUTH_INTERNAL_PORT` answers the `users.findById` message pattern; the global `ErrorResponseFilter` returns `{ statusCode, message, errorCode }` as the RPC error. Only auth-service holds the private key; verifiers get the public key only.
 - Folder structure: feature modules with type subfolders.
   - `src/` root holds only `main.ts` and the root `<app>.module.ts`. The root module is composition only: `ConfigModule.forRoot`, `ClsModule.forRoot` (transactional plugin, write-service only), `PinoLoggerModule`, `APP_FILTER`/`APP_PIPE`, and the feature module imports. It declares no controllers or other providers.
   - Each feature gets a folder with `<feature>.module.ts` at its root and type subfolders for what it contains: `controllers/`, `services/`, `repositories/`, `strategies/`, `dto/`, `errors/`, `constants/`, `utils/` (`<name>.util.ts`, small injectable helpers such as `UserLinkLock`). Only create a subfolder when the feature has a file of that type.
   - Feature modules import the infra libs they use (`AuthDbModule`, `ShortUrlsDbModule.forRoot(...)`, `RedisCacheModule`, `RedisLockModule`) themselves and export only what another module consumes (e.g. auth-service `UsersModule` exports `UsersRepository` to `AuthModule`).
   - New feature: new folder plus module, imported by the root module.
-  - Current features: short-url-read-service `health`, `redirect`; short-url-write-service `health`, `auth` (`JwtStrategy`), `short-urls`, `subscriptions`; auth-service `health`, `users`, `auth`.
+  - Current features: short-url-read-service `health`, `redirect`; short-url-write-service `health`, `auth` (`JwtStrategy`), `short-urls`, `subscriptions`, `billing`, `users-client` (TCP `ClientProxy` to auth-service, `UsersClient`); auth-service `health`, `users`, `auth`.
 - Data access goes through per-app `@Injectable()` repositories (`UsersRepository`, `ShortUrlsRepository`). Only repositories inject a DB client (`AuthDbService`, `ShortUrlsDbService`); services inject repositories; controllers inject services. Repositories select explicit fields and translate Prisma errors into domain errors (e.g. `P2002` → `EmailTakenError`). Each app keeps its own repository scoped to the queries it needs; no shared repository lib.
 - Transactions (Unit of Work) use `@nestjs-cls/transactional` with the Prisma adapter, short-url-write-service only.
   - Services own the boundary with `transactionHost.withTransaction(async () => ...)`, injecting `TransactionHost<ShortUrlsTransactionalAdapter>`. No `@Transactional()` decorator. Services never read `transactionHost.tx`.
@@ -37,7 +44,7 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
 - Error handling:
   - Repositories are the only place that catches infrastructure (Prisma) errors. They rethrow them as domain errors and rethrow everything else untouched.
   - Services throw `DomainError` subclasses from `@app/errors` and never return `null` for "not found". They never import or throw Nest HTTP exceptions.
-  - Each domain error extends a transport-neutral category (`NotFoundError`, `ConflictError`, `ForbiddenError`) and declares a `code`. Add a category to the lib, and map it in the filter, only when a concrete error needs it.
+  - Each domain error extends a transport-neutral category (`NotFoundError`, `ConflictError`, `ForbiddenError`, `UnauthorizedError`, `UnprocessableError`, `BadGatewayError`, `ServiceUnavailableError`) and declares a `code`. Add a category to the lib, and map it in the filter, only when a concrete error needs it.
   - Controllers, guards, pipes and Passport strategies are the HTTP layer. They may throw Nest `HttpException`s and pass `{ errorCode }` when the meaning is more specific than the status.
   - No try/catch in controllers. Each app registers `{ provide: APP_FILTER, useClass: ErrorResponseFilter }`, which is the only place an error becomes an HTTP response.
   - Every error response is `{ statusCode, message, errorCode, ...extra }`.
@@ -72,11 +79,11 @@ High-scale URL shortener. NestJS 12 microservices in a Nest CLI monorepo, behind
     - `opentelemetry` sends traces to otel-lgtm and injects W3C `traceparent` upstream.
     - `cors` allows only the origin `http://localhost:6175`. Every POST route also lists `OPTIONS` so preflights match a route; the plugin answers them without hitting the app. It exposes `Retry-After` and `RateLimit-Limit/Remaining/Reset` so the frontend can read them.
     - `rate-limiting` is `limit_by: ip`, `policy: redis` on the compose `redis` service, db 1 (the cache uses db 0), and keeps the default `fault_tolerant: true`, so it fails open when Redis is down. Use the nested `redis:` block, not the deprecated `redis_host` fields. Kong still logs deprecation warnings for those fields at boot; ignore them.
-      - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; list-short-urls, list-plans and get-subscription 60/min and 1000/h; login 10/min and 100/h; signup 3/min and 20/h. Health routes are unlimited.
+      - Limits: redirect 50/s and 1000/min; create-short-url 20/min and 200/h; list-short-urls, list-plans and get-subscription 60/min and 1000/h; login 10/min and 100/h; signup 3/min and 20/h; get-profile 60/min and 1000/h; update-profile 10/min and 100/h; start-checkout and confirm-checkout 10/min and 60/h; cancel-subscription 5/min and 20/h; glomo-webhooks 600/min and 10000/h. Health routes are unlimited.
       - Preflights are not counted, because `cors` answers them before `rate-limiting` runs.
       - A 429 body is Kong's `{ message, request_id }`, with no `errorCode`. The frontend must handle 429 by status.
       - In prod, Kong needs `KONG_TRUSTED_IPS` and `KONG_REAL_IP_HEADER`, or every client shares the load balancer's IP.
-- Services talk HTTP/REST to Kong and never call each other.
+- The frontend talks HTTP/REST to Kong. Services call each other only through internal Nest TCP message patterns (never through Kong, never across schemas); today only short-url-write-service calls auth-service `users.findById`. The internal port is not routed by Kong.
 - Each app listens on `0.0.0.0` so Kong can reach it from Docker.
 - Builds: each app is bundled by Rspack (`"builder": "rspack"` in `nest-cli.json`) into `dist/apps/<app>/main.js`.
 
@@ -97,6 +104,7 @@ Host ports start at 9111:
 | 9117 | Grafana UI (localhost only, admin/admin) |
 | 9118 | OTLP HTTP into otel-lgtm (localhost only, `OTEL_EXPORTER_OTLP_ENDPOINT`) |
 | 9119 | auth-service (`AUTH_SERVICE_PORT`) |
+| 9120 | auth-service internal TCP (`AUTH_INTERNAL_PORT`, bind `AUTH_INTERNAL_HOST`, not exposed) |
 
 New host ports continue sequentially from 9120.
 
@@ -143,7 +151,7 @@ Health checks through Kong:
 - Tests run without the preload, so they send no telemetry.
 
 ## Current state and decisions
-- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, per-service Postgres schemas and roles, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, listing a user's short URLs, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response, subscription plans with per-plan link limits.
+- Done: monorepo skeleton, Fastify, `@nestjs/config`, a health endpoint per app, Docker infra, Kong routing, Prisma client wiring, per-service Postgres schemas and roles, `ShortUrl` model (`id` BigInt PK, `shortCode` unique, `longUrl`, `createdAt`), `POST /api/short-urls` persisting rows, Redis cache-aside on `GET /:code` in short-url-read-service, auth-service with `User` table plus signup/login, JWT-protected short URL creation stamping `ShortUrl.userId`, listing a user's short URLs, domain errors plus a global `ErrorResponseFilter` (`@app/errors`) with an `errorCode` on every error response, subscription plans with per-plan link limits, Glomo subscription billing, user billing profile.
 - Not yet: do not add these unless the task explicitly asks for them.
   - BullMQ or any other broker.
   - Refresh tokens, logout/revocation, JWKS endpoint, roles, email or password reset.
@@ -188,6 +196,6 @@ Health checks through Kong:
 
 ## Gotchas
 - Host port 6379 may belong to another project's Redis. `REDIS_URL` must point at 9116.
-- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `AUTH_SERVICE_PORT`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (both base64 of a PEM), `DATABASE_ADMIN_URL`, `AUTH_DATABASE_URL`, `SHORT_URLS_WRITE_DATABASE_URL`, `SHORT_URLS_READ_DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`.
+- Claude cannot read or edit `.env*` files (permission deny rule). Ask the user to change them. Keys: `READ_SERVICE_PORT`, `WRITE_SERVICE_PORT`, `AUTH_SERVICE_PORT`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (both base64 of a PEM), `DATABASE_ADMIN_URL`, `AUTH_DATABASE_URL`, `SHORT_URLS_WRITE_DATABASE_URL`, `SHORT_URLS_READ_DATABASE_URL`, `REDIS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`, `AUTH_INTERNAL_HOST`, `AUTH_INTERNAL_PORT`, `GLOMO_API_BASE_URL`, `GLOMO_SECRET_KEY`, `GLOMO_PUBLIC_KEY`, `GLOMO_WEBHOOK_SECRET`.
 - After changing `.env`, restart the service; watch mode does not reload env.
 - A Kong 502 means the target service is not running or is on the wrong port.

@@ -1,0 +1,15 @@
+export const LIVE_SUBSCRIPTION_STATUSES = [
+  'AUTHORIZED',
+  'ACTIVE',
+  'PAUSED',
+  'HALTED',
+  'ACTION_REQUIRED',
+  'UNDER_REVIEW',
+] as const;
+
+export const CANCELLABLE_SUBSCRIPTION_STATUSES = [
+  'AUTHORIZED',
+  'ACTIVE',
+  'PAUSED',
+  'HALTED',
+] as const;

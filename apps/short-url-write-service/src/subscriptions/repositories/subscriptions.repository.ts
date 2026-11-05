@@ -1,19 +1,53 @@
 import { Injectable } from '@nestjs/common';
-import { ShortUrlsDbService } from '@app/short-urls-db';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import { ShortUrlsTransactionalAdapter } from '@app/short-urls-db';
+
+type Plan = 'FREE' | 'PRO' | 'BUSINESS';
 
 @Injectable()
 export class SubscriptionsRepository {
-  constructor(private readonly prisma: ShortUrlsDbService) {}
+  constructor(
+    private readonly transactionHost: TransactionHost<ShortUrlsTransactionalAdapter>,
+  ) {}
 
-  async findPlan(userId: bigint) {
-    const subscriptionPlan = await this.prisma.subscriptionPlan.findUnique({
+  findPlan(userId: bigint) {
+    return this.transactionHost.tx.subscriptionPlan.findUnique({
       where: { userId },
-      select: { plan: true },
+      select: {
+        plan: true,
+        validUntil: true,
+        billingSubscription: {
+          select: {
+            status: true,
+            interval: true,
+            currentPeriodEnd: true,
+            cancelledAt: true,
+          },
+        },
+      },
     });
-    return subscriptionPlan?.plan ?? null;
   }
 
   countLinks(userId: bigint) {
-    return this.prisma.shortUrl.count({ where: { userId } });
+    return this.transactionHost.tx.shortUrl.count({ where: { userId } });
+  }
+
+  grantPlan(userId: bigint, plan: Plan, billingSubscriptionId: bigint) {
+    return this.transactionHost.tx.subscriptionPlan.upsert({
+      where: { userId },
+      create: { userId, plan, billingSubscriptionId, validUntil: null },
+      update: { plan, billingSubscriptionId, validUntil: null },
+    });
+  }
+
+  limitPlanValidity(
+    userId: bigint,
+    billingSubscriptionId: bigint,
+    validUntil: Date,
+  ) {
+    return this.transactionHost.tx.subscriptionPlan.updateMany({
+      where: { userId, billingSubscriptionId },
+      data: { validUntil },
+    });
   }
 }

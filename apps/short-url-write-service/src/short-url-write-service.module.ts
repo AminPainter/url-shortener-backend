@@ -9,6 +9,7 @@ import { PinoLoggerModule } from '@app/logger';
 import { ShortUrlsDbModule, ShortUrlsDbService } from '@app/short-urls-db';
 import { ZodValidationPipe } from '@app/validation';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { HealthModule } from './health/health.module';
 import { ShortUrlsModule } from './short-urls/short-urls.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -37,6 +38,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     AuthModule,
     ShortUrlsModule,
     SubscriptionsModule,
+    BillingModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ErrorResponseFilter },

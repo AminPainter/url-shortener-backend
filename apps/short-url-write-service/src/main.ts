@@ -11,7 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     ShortUrlWriteServiceModule,
     new FastifyAdapter(),
-    { bufferLogs: true },
+    { bufferLogs: true, rawBody: true },
   );
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix('api');

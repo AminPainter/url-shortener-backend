@@ -148,6 +148,61 @@ describe('AuthService (e2e)', () => {
     });
   });
 
+  const signupAndLogin = async () => {
+    await signup({ email, password: 'correct-horse' });
+    return `Bearer ${(await login({ email, password: 'correct-horse' })).json().accessToken}`;
+  };
+
+  const billingAddress = {
+    addressLine1: '1 Main St',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    country: 'ind',
+    pincode: '560001',
+  };
+
+  it('GET /api/auth/me rejects a missing token', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/auth/me' });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('PATCH /api/auth/me stores the billing profile', async () => {
+    const authorization = await signupAndLogin();
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization },
+      payload: { name: 'Test Payer', address: billingAddress },
+    });
+    expect(updated.statusCode).toBe(200);
+    const profile = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { authorization },
+    });
+    expect(profile.json()).toEqual({
+      id: expect.stringMatching(/^\d+$/),
+      email,
+      name: 'Test Payer',
+      address: { ...billingAddress, country: 'IND' },
+    });
+  });
+
+  it.each([
+    { name: '', address: billingAddress },
+    { name: 'Test Payer', address: { ...billingAddress, country: 'IN' } },
+    { name: 'Test Payer', address: { ...billingAddress, city: undefined } },
+  ])('PATCH /api/auth/me rejects %j', async (payload) => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization: await signupAndLogin() },
+      payload,
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errorCode: 'VALIDATION_FAILED' });
+  });
+
   it('cannot read the shorturls schema', async () => {
     await expect(
       app.get(AuthDbService).$queryRaw`SELECT 1 FROM shorturls.short_urls`,

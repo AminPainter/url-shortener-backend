@@ -231,9 +231,19 @@ describe('ShortUrlWriteService (e2e)', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       items: [
-        { plan: 'FREE', name: 'Free', linkLimit: 10 },
-        { plan: 'PRO', name: 'Pro', linkLimit: 100 },
-        { plan: 'BUSINESS', name: 'Business', linkLimit: 1000 },
+        { plan: 'FREE', name: 'Free', linkLimit: 10, prices: null },
+        {
+          plan: 'PRO',
+          name: 'Pro',
+          linkLimit: 100,
+          prices: { currency: 'USD', MONTH: 500, YEAR: 5000 },
+        },
+        {
+          plan: 'BUSINESS',
+          name: 'Business',
+          linkLimit: 1000,
+          prices: { currency: 'USD', MONTH: 2000, YEAR: 20000 },
+        },
       ],
     });
   });
@@ -245,7 +255,9 @@ describe('ShortUrlWriteService (e2e)', () => {
       plan: 'FREE',
       name: 'Free',
       linkLimit: 10,
+      prices: null,
       linkCount: 0,
+      billing: null,
     });
   });
 
@@ -287,7 +299,9 @@ describe('ShortUrlWriteService (e2e)', () => {
       plan: 'PRO',
       name: 'Pro',
       linkLimit: 100,
+      prices: { currency: 'USD', MONTH: 500, YEAR: 5000 },
       linkCount: 11,
+      billing: null,
     });
     await cleanUpUser();
   });

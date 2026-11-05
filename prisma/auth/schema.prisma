@@ -12,7 +12,10 @@ model User {
   id           BigInt   @id @default(autoincrement())
   email        String   @unique
   passwordHash String   @map("password_hash")
+  name         String?
+  address      Json?
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("users")
   @@schema("auth")
