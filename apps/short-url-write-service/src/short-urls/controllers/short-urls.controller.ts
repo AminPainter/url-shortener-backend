@@ -1,13 +1,5 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, UserId } from '@app/jwt-auth';
 import { CreateShortUrlDto } from '../dto/create-short-url.dto';
 import { ListShortUrlsDto } from '../dto/list-short-urls.dto';
 import { ShortUrlsService } from '../services/short-urls.service';
@@ -18,18 +10,12 @@ export class ShortUrlsController {
   constructor(private readonly shortUrlsService: ShortUrlsService) {}
 
   @Post()
-  create(
-    @Body() { longUrl }: CreateShortUrlDto,
-    @Req() request: { userId: bigint },
-  ) {
-    return this.shortUrlsService.create(longUrl, request.userId);
+  create(@Body() { longUrl }: CreateShortUrlDto, @UserId() userId: bigint) {
+    return this.shortUrlsService.create(longUrl, userId);
   }
 
   @Get()
-  list(
-    @Query() { cursor, limit }: ListShortUrlsDto,
-    @Req() request: { userId: bigint },
-  ) {
-    return this.shortUrlsService.list(request.userId, limit, cursor);
+  list(@Query() { cursor, limit }: ListShortUrlsDto, @UserId() userId: bigint) {
+    return this.shortUrlsService.list(userId, limit, cursor);
   }
 }

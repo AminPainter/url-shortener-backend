@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, UserId } from '@app/jwt-auth';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { UsersService } from '../services/users.service';
 
@@ -9,15 +9,12 @@ export class MeController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  get(@Req() request: { userId: bigint }) {
-    return this.usersService.getProfile(request.userId);
+  get(@UserId() userId: bigint) {
+    return this.usersService.getProfile(userId);
   }
 
   @Patch()
-  update(
-    @Body() updateProfileDto: UpdateProfileDto,
-    @Req() request: { userId: bigint },
-  ) {
-    return this.usersService.updateProfile(request.userId, updateProfileDto);
+  update(@Body() updateProfileDto: UpdateProfileDto, @UserId() userId: bigint) {
+    return this.usersService.updateProfile(userId, updateProfileDto);
   }
 }

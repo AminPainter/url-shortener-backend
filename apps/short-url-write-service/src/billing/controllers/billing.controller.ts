@@ -1,12 +1,5 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, UserId } from '@app/jwt-auth';
 import { ConfirmCheckoutDto } from '../dto/confirm-checkout.dto';
 import { StartCheckoutDto } from '../dto/start-checkout.dto';
 import { BillingService } from '../services/billing.service';
@@ -19,26 +12,23 @@ export class BillingController {
   @Post('checkout')
   startCheckout(
     @Body() { plan, interval }: StartCheckoutDto,
-    @Req() request: { userId: bigint },
+    @UserId() userId: bigint,
   ) {
-    return this.billingService.startCheckout(request.userId, plan, interval);
+    return this.billingService.startCheckout(userId, plan, interval);
   }
 
   @Post('checkout/confirm')
   @HttpCode(200)
   confirmCheckout(
     @Body() confirmCheckoutDto: ConfirmCheckoutDto,
-    @Req() request: { userId: bigint },
+    @UserId() userId: bigint,
   ) {
-    return this.billingService.confirmCheckout(
-      request.userId,
-      confirmCheckoutDto,
-    );
+    return this.billingService.confirmCheckout(userId, confirmCheckoutDto);
   }
 
   @Post('cancel')
   @HttpCode(200)
-  cancel(@Req() request: { userId: bigint }) {
-    return this.billingService.cancel(request.userId);
+  cancel(@UserId() userId: bigint) {
+    return this.billingService.cancel(userId);
   }
 }
