@@ -6,27 +6,11 @@ import { UsersRepository } from '../repositories/users.repository';
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
-  async getProfile(userId: string) {
-    return this.toProfile(await this.usersRepository.findProfile(userId));
+  getProfile(userId: string) {
+    return this.usersRepository.findProfile(userId);
   }
 
-  async updateProfile(userId: string, { name, address }: UpdateProfileDto) {
-    return this.toProfile(
-      await this.usersRepository.updateProfile(userId, name, address),
-    );
-  }
-
-  private toProfile(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    address: unknown;
-  }) {
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      address: user.address,
-    };
+  updateProfile(userId: string, { name, address }: UpdateProfileDto) {
+    return this.usersRepository.updateProfile(userId, name, address);
   }
 }
