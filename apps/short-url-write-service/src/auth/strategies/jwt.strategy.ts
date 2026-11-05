@@ -18,6 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate({ sub }: { sub: string }) {
-    return { userId: BigInt(sub) };
+    return BigInt(sub);
   }
 }
